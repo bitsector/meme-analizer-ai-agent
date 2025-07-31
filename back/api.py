@@ -32,6 +32,8 @@ async def analyze_file(file: UploadFile = File(...)):
         return {
             "filename": file.filename,
             "text": result["text"],
+            "content_type": result["content_type"],
+            "search_results": result["search_results"],
             "usage": result["usage"]
         }
     

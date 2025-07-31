@@ -123,7 +123,24 @@
                 showDebug(`File ${file.name} processed successfully`);
                 
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = '<h3>Extracted Text:</h3>' + result.text;
+                
+                let html = '<h3>Extracted Text:</h3>' + result.text;
+                
+                if (result.content_type) {
+                    html += '<h3>Content Type:</h3>' + result.content_type;
+                }
+                
+                if (result.search_results && result.search_results !== "No search performed - content type not suitable for web search") {
+                    html += '<h3>Search Results:</h3>' + result.search_results;
+                }
+                
+                if (result.usage) {
+                    html += '<h3>Usage:</h3>';
+                    html += `Tokens: ${result.usage.total_tokens} (prompt: ${result.usage.prompt_tokens}, completion: ${result.usage.completion_tokens})<br>`;
+                    html += `Cost: $${result.usage.total_cost.toFixed(6)}`;
+                }
+                
+                resultDiv.innerHTML = html;
                 
             } catch (error) {
                 showDebug(`Error processing ${file.name}: ${error.message}`);
