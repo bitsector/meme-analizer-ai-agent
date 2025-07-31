@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR File Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #999;
+        }
+        .upload-area.dragover {
+            border-color: #666;
+            background-color: #f5f5f5;
+        }
+        #fileInput {
+            display: none;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .debug {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e6f3ff;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            background-color: #ffe6e6;
+        }
+    </style>
+</head>
+<body>
+    <h1>OCR File Upload Service</h1>
+    
+    <div class="upload-area" id="uploadArea">
+        <p>Drag and drop an image file here, or click to select</p>
+        <input type="file" id="fileInput" accept="image/*">
+    </div>
+    
+    <div id="debug" class="debug" style="display: none;"></div>
+    <div id="result" class="result" style="display: none;"></div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const debugDiv = document.getElementById('debug');
+        const resultDiv = document.getElementById('result');
+
+        function showDebug(message) {
+            debugDiv.style.display = 'block';
+            debugDiv.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+        }
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            showDebug(`File ${file.name} selected`);
+            
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                showDebug(`Sending file ${file.name} to backend...`);
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                showDebug(`File ${file.name} processed successfully`);
+                
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<h3>Extracted Text:</h3>' + result.text;
+                
+            } catch (error) {
+                showDebug(`Error processing ${file.name}: ${error.message}`);
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '<h3>Error:</h3>' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

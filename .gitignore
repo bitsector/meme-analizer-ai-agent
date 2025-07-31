@@ -144,6 +144,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# Node.js dependencies
+node_modules/
+
+# Temporary upload files
+front/uploads/
+
 # Spyder project settings
 .spyderproject
 .spyproject
