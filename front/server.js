@@ -6,7 +6,7 @@ const fs = require('fs');
 
 const app = express();
 const PORT = 3000;
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 const upload = multer({ dest: 'uploads/' });
 

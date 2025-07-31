@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    image: antonbiz/agent-back:1.0
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - app-network
+
+  frontend:
+    image: antonbiz/agent-front:1.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

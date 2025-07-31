@@ -65,6 +65,46 @@ npm start
 
 The frontend will be available at `http://localhost:3000`
 
+## Docker Setup (Recommended)
+
+### Prerequisites
+- Docker and Docker Compose v2 installed
+
+### Building Docker Images
+
+From the project root directory:
+
+```bash
+# Build backend image
+docker build -t antonbiz/agent-back:1.0 ./back
+
+# Build frontend image  
+docker build -t antonbiz/agent-front:1.0 ./front
+```
+
+### Running with Docker Compose
+
+```bash
+# Start all services
+docker compose up
+
+# Start in detached mode
+docker compose up -d
+
+# View logs from all containers
+docker compose logs -f
+
+# Stop all services
+docker compose down
+
+# Rebuild and start (after code changes)
+docker compose up --build
+```
+
+The application will be available at:
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
+
 ## Usage
 
 1. Make sure both backend and frontend servers are running
