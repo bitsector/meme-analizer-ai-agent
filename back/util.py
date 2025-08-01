@@ -13,22 +13,22 @@ def print_graph_structure(workflow, graph):
     if print_graph == "0":
         return
     
-    logger.info("[bold magenta]LangGraph Structure:[/bold magenta]")
+    logger.info("LangGraph Structure:")
     try:
         # Print nodes
         nodes = list(workflow.nodes.keys())
-        logger.info(f"[cyan]Nodes:[/cyan] {', '.join(nodes)}")
+        logger.info(f"Nodes: {', '.join(nodes)}")
         
         # Print edges - avoiding the 'set' object error
         edges = []
         for source in workflow.edges:
-            logger.info(f"[cyan]Edge from {source}[/cyan]")
+            logger.info(f"Edge from {source}")
         
         # Print entry point
-        logger.info(f"[cyan]Entry Point:[/cyan] ocr")
+        logger.info(f"Entry Point: ocr")
         
     except Exception as e:
-        logger.error(f"[bold red]Error printing graph structure:[/bold red] {str(e)}")
+        logger.error(f"Error printing graph structure: {str(e)}")
 
 def print_detailed_graph_structure():
     """Print detailed graph structure for main() function"""
@@ -36,42 +36,42 @@ def print_detailed_graph_structure():
     if print_graph == "0":
         return
     
-    logger.info("[bold magenta]═══ LangGraph Workflow Structure ═══[/bold magenta]")
+    logger.info("=== LangGraph Workflow Structure ===")
     
     try:
         # Print nodes with descriptions
-        logger.info("[bold cyan]📍 NODES:[/bold cyan]")
-        logger.info("  • [yellow]ocr[/yellow]: Extracts text from image using GPT-4o-mini vision")
-        logger.info("  • [yellow]search[/yellow]: Searches web for ARTICLE/FACTS content using DuckDuckGo")
-        logger.info("  • [yellow]sentiment_analysis[/yellow]: Analyzes sentiment (POSITIVE/NEGATIVE/NEUTRAL)")
-        logger.info("  • [yellow]political_analysis[/yellow]: Detects political content (YES/NO)")
-        logger.info("  • [yellow]outrage_analysis[/yellow]: Detects outrage/inflammatory content (YES/NO)")
-        logger.info("  • [yellow]result[/yellow]: Final result aggregation node")
+        logger.info("NODES:")
+        logger.info("  • ocr: Extracts text from image using GPT-4o-mini vision")
+        logger.info("  • search: Searches web for ARTICLE/FACTS content using DuckDuckGo")
+        logger.info("  • sentiment_analysis: Analyzes sentiment (POSITIVE/NEGATIVE/NEUTRAL)")
+        logger.info("  • political_analysis: Detects political content (YES/NO)")
+        logger.info("  • outrage_analysis: Detects outrage/inflammatory content (YES/NO)")
+        logger.info("  • result: Final result aggregation node")
         
         # Print edges (flow)
-        logger.info("[bold cyan]🔗 WORKFLOW FLOW:[/bold cyan]")
-        logger.info("  [green]START[/green] → [yellow]ocr[/yellow] → [magenta]conditional[/magenta]")
-        logger.info("    ├─ if MEME/OTHER → [yellow]sentiment_analysis[/yellow]")
-        logger.info("    └─ if ARTICLE/FACTS → [yellow]search[/yellow] → [yellow]sentiment_analysis[/yellow]")
-        logger.info("  [yellow]sentiment_analysis[/yellow] → [yellow]political_analysis[/yellow] → [yellow]outrage_analysis[/yellow] → [yellow]result[/yellow] → [red]END[/red]")
+        logger.info("WORKFLOW FLOW:")
+        logger.info("  START → ocr → conditional")
+        logger.info("    ├─ if MEME/OTHER → sentiment_analysis")
+        logger.info("    └─ if ARTICLE/FACTS → search → sentiment_analysis")
+        logger.info("  sentiment_analysis → political_analysis → outrage_analysis → result → END")
         
         # Print entry point
-        logger.info(f"[bold cyan]🚀 ENTRY POINT:[/bold cyan] [yellow]ocr[/yellow]")
+        logger.info(f"ENTRY POINT: ocr")
         
         # Print state schema
-        logger.info("[bold cyan]📊 STATE SCHEMA:[/bold cyan]")
-        logger.info("  • [blue]ocr_result[/blue]: str - Extracted text from image")
-        logger.info("  • [blue]content_type[/blue]: str - MEME/ARTICLE/FACTS/OTHER")
-        logger.info("  • [blue]search_results[/blue]: str - Web search results")
-        logger.info("  • [blue]sentiment[/blue]: str - POSITIVE/NEGATIVE/NEUTRAL")
-        logger.info("  • [blue]is_political[/blue]: str - YES/NO")
-        logger.info("  • [blue]is_outrage[/blue]: str - YES/NO")
-        logger.info("  • [blue]cb[/blue]: dict - Token usage and cost info")
+        logger.info("STATE SCHEMA:")
+        logger.info("  • ocr_result: str - Extracted text from image")
+        logger.info("  • content_type: str - MEME/ARTICLE/FACTS/OTHER")
+        logger.info("  • search_results: str - Web search results")
+        logger.info("  • sentiment: str - POSITIVE/NEGATIVE/NEUTRAL")
+        logger.info("  • is_political: str - YES/NO")
+        logger.info("  • is_outrage: str - YES/NO")
+        logger.info("  • cb: dict - Token usage and cost info")
         
-        logger.info("[bold green]✅ Graph structure displayed successfully![/bold green]")
+        logger.info("Graph structure displayed successfully!")
         
     except Exception as e:
-        logger.error(f"[bold red]❌ Error displaying graph structure:[/bold red] {str(e)}")
+        logger.error(f"Error displaying graph structure: {str(e)}")
 
 def try_generate_visual_graph(graph):
     """Try to generate visual graph PNG"""
@@ -79,7 +79,7 @@ def try_generate_visual_graph(graph):
     if print_graph == "0":
         return
     
-    logger.info("[bold cyan]🎨 GENERATING VISUAL GRAPH...[/bold cyan]")
+    logger.info("GENERATING VISUAL GRAPH...")
     try:
         # LangGraph has built-in visualization
         graph_png = graph.get_graph().draw_mermaid_png()
@@ -87,18 +87,18 @@ def try_generate_visual_graph(graph):
         # Save to file
         with open("langgraph_workflow.png", "wb") as f:
             f.write(graph_png)
-        logger.info("[bold green]✅ Graph saved as 'langgraph_workflow.png'![/bold green]")
+        logger.info("Graph saved as 'langgraph_workflow.png'!")
         
     except ImportError as ie:
-        logger.warning(f"[bold yellow]⚠️  Visual graph generation requires additional packages:[/bold yellow] {str(ie)}")
-        logger.info("[bold yellow]💡 To install: pip install 'langgraph[mermaid]'[/bold yellow]")
+        logger.warning(f"Visual graph generation requires additional packages: {str(ie)}")
+        logger.info("To install: pip install 'langgraph[mermaid]'")
         
     except Exception as ve:
-        logger.warning(f"[bold yellow]⚠️  Visual graph generation failed:[/bold yellow] {str(ve)}")
-        logger.info("[bold yellow]💡 Showing text representation instead[/bold yellow]")
+        logger.warning(f"Visual graph generation failed: {str(ve)}")
+        logger.info("Showing text representation instead")
         
         # Fallback: ASCII art representation
-        logger.info("[bold cyan]📊 ASCII GRAPH:[/bold cyan]")
+        logger.info("ASCII GRAPH:")
         logger.info("┌─────────┐")
         logger.info("│  START  │")
         logger.info("└────┬────┘")

@@ -150,6 +150,10 @@ node_modules/
 # Temporary upload files
 front/uploads/
 
+# Generated graph images
+*.png
+langgraph_workflow.png
+
 # Spyder project settings
 .spyderproject
 .spyproject

@@ -34,6 +34,8 @@ async def analyze_file(file: UploadFile = File(...)):
             "text": result["text"],
             "content_type": result["content_type"],
             "search_results": result["search_results"],
+            "meme_name": result["meme_name"],
+            "explain_humor": result["explain_humor"],
             "sentiment": result["sentiment"],
             "is_political": result["is_political"],
             "is_outrage": result["is_outrage"],

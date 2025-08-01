@@ -137,7 +137,17 @@
                     html += '<h3>Search Results:</h3>' + result.search_results;
                 }
                 
-                // New analysis fields - showing all for debugging
+                // Meme-specific fields (only show if content type is MEME)
+                if (result.content_type === 'MEME') {
+                    if (result.meme_name && result.meme_name !== 'N/A') {
+                        html += '<h3>Meme Name:</h3>' + result.meme_name;
+                    }
+                    if (result.explain_humor && result.explain_humor !== 'N/A') {
+                        html += '<h3>Humor Explanation:</h3>' + result.explain_humor;
+                    }
+                }
+                
+                // Analysis fields - showing all for debugging
                 html += '<h3>Sentiment Analysis:</h3>' + (result.sentiment || 'NOT SET');
                 html += '<h3>Political Content:</h3>' + (result.is_political || 'NOT SET');
                 html += '<h3>Outrage Content:</h3>' + (result.is_outrage || 'NOT SET');
