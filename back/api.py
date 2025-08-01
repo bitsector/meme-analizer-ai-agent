@@ -2,7 +2,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from services import analyze_image
-import io
 
 app = FastAPI(title="OCR Analysis API", version="1.0.0")
 

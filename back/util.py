@@ -1,4 +1,5 @@
 import os
+import base64
 import logging
 from dotenv import load_dotenv
 
@@ -6,6 +7,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def encode_image_to_base64(image_data):
+    """Convert image data to base64 string for OpenAI Vision API"""
+    if isinstance(image_data, str):
+        with open(image_data, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode("utf-8")
+    else:
+        return base64.b64encode(image_data).decode("utf-8")
 
 def print_graph_structure(workflow, graph):
     """Print the LangGraph structure if PRINT_GRAPH is enabled"""
