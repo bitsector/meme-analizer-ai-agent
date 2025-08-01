@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OCR File Upload</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>OCR File Upload v2.1</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -133,6 +136,15 @@
                 if (result.search_results && result.search_results !== "No search performed - content type not suitable for web search") {
                     html += '<h3>Search Results:</h3>' + result.search_results;
                 }
+                
+                // New analysis fields - showing all for debugging
+                html += '<h3>Sentiment Analysis:</h3>' + (result.sentiment || 'NOT SET');
+                html += '<h3>Political Content:</h3>' + (result.is_political || 'NOT SET');
+                html += '<h3>Outrage Content:</h3>' + (result.is_outrage || 'NOT SET');
+                
+                // Debug: Log the full result to console and show in UI
+                console.log('Full backend result:', result);
+                html += '<h3>DEBUG - Full Response:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
                 
                 if (result.usage) {
                     html += '<h3>Usage:</h3>';

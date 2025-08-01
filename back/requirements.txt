@@ -8,3 +8,4 @@ langgraph>=0.0.62
 langchain-openai>=0.0.2
 langchain-core>=0.1.3
 rich>=13.0.0
+duckduckgo-search>=5.0.0

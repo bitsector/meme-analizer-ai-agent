@@ -9,6 +9,7 @@ from typing import TypedDict
 from rich.logging import RichHandler
 from rich.console import Console
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
+from util import print_graph_structure, print_detailed_graph_structure, try_generate_visual_graph
 
 # Load environment variables
 load_dotenv()
@@ -23,7 +24,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Environment variables
 LLM_API_KEY = os.getenv("LLM_API_KEY")
+MODEL = os.getenv("MODEL", "gpt-4o-mini")
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "100"))
+
 if not LLM_API_KEY:
     raise ValueError("LLM_API_KEY not set in .env file.")
 
@@ -32,6 +37,9 @@ class GraphState(TypedDict):
     ocr_result: str
     content_type: str
     search_results: str
+    sentiment: str
+    is_political: str
+    is_outrage: str
     cb: dict
 
 def encode_image_to_base64(image_data):
@@ -104,6 +112,9 @@ CONTENT_TYPE: [MEME/ARTICLE/FACTS/OTHER]"""},
             "ocr_result": ocr_result, 
             "content_type": content_type,
             "search_results": "",
+            "sentiment": "",
+            "is_political": "",
+            "is_outrage": "",
             "cb": cb_info
         }
     return ocr_node
@@ -143,33 +154,219 @@ def create_search_node():
                 return {**state, "search_results": f"Search failed: {str(e)}"}
         else:
             logger.info(f"[bold yellow]Skipping search for content type: {content_type}[/bold yellow]")
-            return {**state, "search_results": "No search performed - content type not suitable for web search"}
+            return {**state, "search_results": f"No search performed - {content_type} content doesn't require fact-checking"}
     
     return search_node
+
+def create_sentiment_analysis_node():
+    def sentiment_analysis_node(state):
+        ocr_result = state.get("ocr_result", "")
+        
+        if not ocr_result.strip():
+            logger.info("[bold yellow]No text to analyze for sentiment[/bold yellow]")
+            return {**state, "sentiment": "NEUTRAL"}
+        
+        logger.info("[bold cyan]Analyzing sentiment...[/bold cyan]")
+        
+        llm = ChatOpenAI(
+            api_key=LLM_API_KEY,
+            model=MODEL,
+            max_tokens=MAX_TOKENS
+        )
+        
+        prompt = f"""Analyze the sentiment of this text and classify it as one of: POSITIVE, NEGATIVE, NEUTRAL
+
+        Text: {ocr_result}
+
+        Respond with only one word: POSITIVE, NEGATIVE, or NEUTRAL"""
+        
+        try:
+            with get_openai_callback() as cb:
+                response = llm.invoke(prompt)
+                sentiment = response.content.strip().upper()
+                
+                # Validate response
+                if sentiment not in ["POSITIVE", "NEGATIVE", "NEUTRAL"]:
+                    sentiment = "NEUTRAL"
+                
+                logger.info(f"[bold green]Sentiment:[/bold green] {sentiment}")
+                return {**state, "sentiment": sentiment}
+                
+        except Exception as e:
+            logger.error(f"[bold red]Sentiment analysis failed:[/bold red] {str(e)}")
+            return {**state, "sentiment": "NEUTRAL"}
+    
+    return sentiment_analysis_node
+
+def create_political_analysis_node():
+    def political_analysis_node(state):
+        ocr_result = state.get("ocr_result", "")
+        
+        if not ocr_result.strip():
+            logger.info("[bold yellow]No text to analyze for political content[/bold yellow]")
+            return {**state, "is_political": "NO"}
+        
+        logger.info("[bold cyan]Analyzing political content...[/bold cyan]")
+        
+        llm = ChatOpenAI(
+            api_key=LLM_API_KEY,
+            model=MODEL,
+            max_tokens=MAX_TOKENS
+        )
+        
+        prompt = f"""Analyze if this text contains political content. Political content includes:
+        - References to politicians, political parties, elections
+        - Policy discussions, government actions
+        - Political ideologies, movements
+        - Current political events or controversies
+
+        Text: {ocr_result}
+
+        Respond with only: YES or NO"""
+        
+        try:
+            with get_openai_callback() as cb:
+                response = llm.invoke(prompt)
+                is_political = response.content.strip().upper()
+                
+                # Validate response
+                if is_political not in ["YES", "NO"]:
+                    is_political = "NO"
+                
+                logger.info(f"[bold green]Political content:[/bold green] {is_political}")
+                return {**state, "is_political": is_political}
+                
+        except Exception as e:
+            logger.error(f"[bold red]Political analysis failed:[/bold red] {str(e)}")
+            return {**state, "is_political": "NO"}
+    
+    return political_analysis_node
+
+def create_outrage_analysis_node():
+    def outrage_analysis_node(state):
+        ocr_result = state.get("ocr_result", "")
+        
+        if not ocr_result.strip():
+            logger.info("[bold yellow]No text to analyze for outrage content[/bold yellow]")
+            return {**state, "is_outrage": "NO"}
+        
+        logger.info("[bold cyan]Analyzing outrage content...[/bold cyan]")
+        
+        llm = ChatOpenAI(
+            api_key=LLM_API_KEY,
+            model=MODEL,
+            max_tokens=MAX_TOKENS
+        )
+        
+        prompt = f"""Analyze if this text is designed to provoke outrage, anger, or strong emotional reactions. Look for:
+        - Inflammatory language, extreme statements
+        - Divisive or polarizing content
+        - Content designed to make people angry
+        - Sensationalized claims or fear-mongering
+        - Clickbait-style emotional manipulation
+
+        Text: {ocr_result}
+
+        Respond with only: YES or NO"""
+        
+        try:
+            with get_openai_callback() as cb:
+                response = llm.invoke(prompt)
+                is_outrage = response.content.strip().upper()
+                
+                # Validate response
+                if is_outrage not in ["YES", "NO"]:
+                    is_outrage = "NO"
+                
+                logger.info(f"[bold green]Outrage content:[/bold green] {is_outrage}")
+                return {**state, "is_outrage": is_outrage}
+                
+        except Exception as e:
+            logger.error(f"[bold red]Outrage analysis failed:[/bold red] {str(e)}")
+            return {**state, "is_outrage": "NO"}
+    
+    return outrage_analysis_node
 
 def create_result_node():
     def result_node(state):
         return state
     return result_node
 
+def should_search(state):
+    """Conditional routing: search only for ARTICLE/FACTS, go to sentiment for MEME/OTHER"""
+    content_type = state.get("content_type", "OTHER")
+    if content_type in ["ARTICLE", "FACTS"]:
+        return "search"
+    else:
+        return "sentiment_analysis"
+
 def analyze_image(image_data):
     workflow = StateGraph(GraphState)
     workflow.add_node("ocr", create_ocr_node(image_data))
     workflow.add_node("search", create_search_node())
+    workflow.add_node("sentiment_analysis", create_sentiment_analysis_node())
+    workflow.add_node("political_analysis", create_political_analysis_node())
+    workflow.add_node("outrage_analysis", create_outrage_analysis_node())
     workflow.add_node("result", create_result_node())
     
     workflow.set_entry_point("ocr")
-    workflow.add_edge("ocr", "search")
-    workflow.add_edge("search", "result")
+    workflow.add_conditional_edges("ocr", should_search)
+    workflow.add_edge("search", "sentiment_analysis")
+    workflow.add_edge("sentiment_analysis", "political_analysis")
+    workflow.add_edge("political_analysis", "outrage_analysis")
+    workflow.add_edge("outrage_analysis", "result")
     workflow.add_edge("result", END)
     
     graph = workflow.compile()
+    
+    # Print graph structure (if enabled)
+    print_graph_structure(workflow, graph)
+    
     result = graph.invoke({})
     
+    # Debug: Log the final result state
+    logger.info(f"[bold magenta]Final result state:[/bold magenta] {result}")
+    
     return {
-        "text": result["ocr_result"],
-        "content_type": result["content_type"],
-        "search_results": result["search_results"],
-        "usage": result["cb"]
+        "text": result.get("ocr_result", ""),
+        "content_type": result.get("content_type", ""),
+        "search_results": result.get("search_results", ""),
+        "sentiment": result.get("sentiment", ""),
+        "is_political": result.get("is_political", ""),
+        "is_outrage": result.get("is_outrage", ""),
+        "usage": result.get("cb", {})
     }
+
+def main():
+    """Visualize the LangGraph structure and generate PNG image"""
+    logger.info("[bold green]Building LangGraph workflow for visualization...[/bold green]")
+    
+    # Create the workflow (same as in analyze_image but without execution)
+    workflow = StateGraph(GraphState)
+    workflow.add_node("ocr", create_ocr_node(None))  # Dummy node for structure
+    workflow.add_node("search", create_search_node())
+    workflow.add_node("sentiment_analysis", create_sentiment_analysis_node())
+    workflow.add_node("political_analysis", create_political_analysis_node())
+    workflow.add_node("outrage_analysis", create_outrage_analysis_node())
+    workflow.add_node("result", create_result_node())
+    
+    workflow.set_entry_point("ocr")
+    workflow.add_conditional_edges("ocr", should_search)
+    workflow.add_edge("search", "sentiment_analysis")
+    workflow.add_edge("sentiment_analysis", "political_analysis")
+    workflow.add_edge("political_analysis", "outrage_analysis")
+    workflow.add_edge("outrage_analysis", "result")
+    workflow.add_edge("result", END)
+    
+    # Compile the graph
+    graph = workflow.compile()
+    
+    # Print detailed graph structure (if enabled)
+    print_detailed_graph_structure()
+    
+    # Try to generate visual graph (if enabled)
+    try_generate_visual_graph(graph)
+
+if __name__ == "__main__":
+    main()
 
