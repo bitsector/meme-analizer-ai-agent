@@ -1,10 +1,13 @@
 from langgraph.graph import StateGraph, END
 from typing import TypedDict
+from logging_config import get_logger
 from nodes import (
     create_ocr_node,
     create_search_node, 
     create_meme_name_analysis_node,
     create_explain_humor_analysis_node,
+    create_social_media_detection_node,
+    create_recognise_poster_node,
     create_sentiment_analysis_node,
     create_political_analysis_node,
     create_outrage_analysis_node,
@@ -19,6 +22,8 @@ class GraphState(TypedDict):
     search_results: str
     meme_name: str
     explain_humor: str
+    social_media_platform: str
+    poster_name: str
     sentiment: str
     is_political: str
     is_outrage: str
@@ -26,12 +31,14 @@ class GraphState(TypedDict):
 
 
 def should_search(state):
-    """Conditional routing: search only for ARTICLE/FACTS, meme analysis for MEME, sentiment for OTHER"""
+    """Conditional routing: search for ARTICLE/FACTS, meme analysis for MEME, social media for SOCIAL_MEDIA, sentiment for OTHER"""
     content_type = state.get("content_type", "OTHER")
     if content_type in ["ARTICLE", "FACTS"]:
         return "search"
     elif content_type == "MEME":
         return "meme_name_analysis"
+    elif content_type == "SOCIAL_MEDIA":
+        return "social_media_detection"
     else:
         return "sentiment_analysis"
 
@@ -59,6 +66,8 @@ def get_workflow(image_data):
     workflow.add_node("search", create_search_node())
     workflow.add_node("meme_name_analysis", create_meme_name_analysis_node())
     workflow.add_node("explain_humor_analysis", create_explain_humor_analysis_node())
+    workflow.add_node("social_media_detection", create_social_media_detection_node())
+    workflow.add_node("recognise_poster", create_recognise_poster_node())
     workflow.add_node("sentiment_analysis", create_sentiment_analysis_node())
     workflow.add_node("political_analysis", create_political_analysis_node())
     workflow.add_node("outrage_analysis", create_outrage_analysis_node())
@@ -70,6 +79,8 @@ def get_workflow(image_data):
     workflow.add_edge("search", "sentiment_analysis")
     workflow.add_edge("meme_name_analysis", "explain_humor_analysis")
     workflow.add_edge("explain_humor_analysis", "sentiment_analysis")
+    workflow.add_edge("social_media_detection", "recognise_poster")
+    workflow.add_edge("recognise_poster", "sentiment_analysis")
     workflow.add_edge("sentiment_analysis", "political_analysis")
     workflow.add_edge("political_analysis", "outrage_analysis")
     workflow.add_edge("outrage_analysis", "result")

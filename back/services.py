@@ -1,31 +1,8 @@
-import os
-import logging
-from dotenv import load_dotenv
-from rich.logging import RichHandler
-from rich.console import Console
-from util import print_graph_structure, print_detailed_graph_structure, try_generate_visual_graph
+from util import print_graph_structure, print_detailed_graph_structure, try_generate_visual_graph, model_config
 from workflow import get_workflow
+from logging_config import get_logger
 
-# Load environment variables
-load_dotenv()
-
-# Setup rich logging
-console = Console()
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True)]
-)
-logger = logging.getLogger(__name__)
-
-# Environment variables
-LLM_API_KEY = os.getenv("LLM_API_KEY")
-MODEL = os.getenv("MODEL", "gpt-4o-mini")
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "100"))
-
-if not LLM_API_KEY:
-    raise ValueError("LLM_API_KEY not set in .env file.")
+logger = get_logger(__name__)
 
 
 def analyze_image(image_data):
@@ -61,7 +38,7 @@ def analyze_image(image_data):
     graph = get_workflow(image_data)
     
     # Print graph structure (if enabled)
-    print_graph_structure(None, graph)
+    print_graph_structure(graph, graph)
     
     result = graph.invoke({})
     
@@ -74,6 +51,8 @@ def analyze_image(image_data):
         "search_results": result.get("search_results", ""),
         "meme_name": result.get("meme_name", ""),
         "explain_humor": result.get("explain_humor", ""),
+        "social_media_platform": result.get("social_media_platform", ""),
+        "poster_name": result.get("poster_name", ""),
         "sentiment": result.get("sentiment", ""),
         "is_political": result.get("is_political", ""),
         "is_outrage": result.get("is_outrage", ""),

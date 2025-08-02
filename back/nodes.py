@@ -1,21 +1,11 @@
-import os
-import logging
-from dotenv import load_dotenv
 from langchain_community.callbacks import get_openai_callback
 from langchain_openai import ChatOpenAI
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
 from langchain_core.messages import HumanMessage
-from util import encode_image_to_base64
+from util import encode_image_to_base64, model_config
+from logging_config import get_logger
 
-# Load environment variables
-load_dotenv()
-
-logger = logging.getLogger(__name__)
-
-# Environment variables
-LLM_API_KEY = os.getenv("LLM_API_KEY")
-MODEL = os.getenv("MODEL", "gpt-4o-mini")
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "100"))
+logger = get_logger(__name__)
 
 
 
@@ -30,30 +20,51 @@ def create_ocr_node(image_data):
 
                 1. OCR: Extract all the text you see in the image
                 2. CONTENT_TYPE: Classify the content as one of these categories:
-                   - MEME: Humorous images, social media posts, jokes, memes
+                   - MEME: Humorous images, jokes, memes (NOT social media screenshots)
                    - ARTICLE: News articles, blog posts, formal written content, journalistic text
                    - FACTS: Educational content, Wikipedia-style information, factual data, statistics
+                   - SOCIAL_MEDIA: Screenshots of social media posts (Twitter/X, Facebook, Instagram, Reddit, TikTok, etc.) with visible platform UI elements like usernames, avatars, timestamps, like/share buttons
                    - OTHER: None of the above categories
 
                 Format your response exactly like this:
                 OCR: [extracted text here]
-                CONTENT_TYPE: [MEME/ARTICLE/FACTS/OTHER]"""},
+                CONTENT_TYPE: [MEME/ARTICLE/FACTS/SOCIAL_MEDIA/OTHER]"""},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}}
             ])
         ]
         llm = ChatOpenAI(
-            api_key=LLM_API_KEY,
-            model="gpt-4o-mini",
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
             max_tokens=512
         )
-        with get_openai_callback() as cb:
-            response = llm.invoke(prompt)
-            cb_info = {
-                "prompt_tokens": cb.prompt_tokens,
-                "completion_tokens": cb.completion_tokens,
-                "total_tokens": cb.total_tokens,
-                "total_cost": cb.total_cost,
-            }
+        try:
+            with get_openai_callback() as cb:
+                response = llm.invoke(prompt)
+                cb_info = {
+                    "prompt_tokens": cb.prompt_tokens,
+                    "completion_tokens": cb.completion_tokens,
+                    "total_tokens": cb.total_tokens,
+                    "total_cost": cb.total_cost,
+                }
+        except Exception as e:
+            error_msg = str(e)
+            if "unsupported_country_region_territory" in error_msg or "403" in error_msg:
+                logger.error("OpenAI API is not available in your region. Please use a VPN or try Azure OpenAI.")
+                return {
+                    "ocr_result": "Error: OpenAI API blocked in your region", 
+                    "content_type": "ERROR",
+                    "search_results": "",
+                    "meme_name": "",
+                    "explain_humor": "",
+                    "social_media_platform": "",
+                    "poster_name": "",
+                    "sentiment": "",
+                    "is_political": "",
+                    "is_outrage": "",
+                    "cb": {"error": error_msg}
+                }
+            else:
+                raise e
         
         # Parse the response to extract OCR and content type
         response_text = response.content
@@ -85,6 +96,8 @@ def create_ocr_node(image_data):
             "search_results": "",
             "meme_name": "",
             "explain_humor": "",
+            "social_media_platform": "",
+            "poster_name": "",
             "sentiment": "",
             "is_political": "",
             "is_outrage": "",
@@ -148,33 +161,45 @@ def create_meme_name_analysis_node():
         logger.info("Analyzing meme name...")
         
         llm = ChatOpenAI(
-            api_key=LLM_API_KEY,
-            model=MODEL,
-            max_tokens=MAX_TOKENS
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=model_config.get_max_tokens()
         )
         
-        prompt = f"""Identify the name of this meme based on the text content. Look for well-known meme formats like:
-        - "Distracted Boyfriend" 
-        - "Drake Pointing"
-        - "One Does Not Simply"
-        - "Hide the Pain Harold"
-        - "Good Guy Greg"
-        - "Scumbag Steve"
-        - "Success Kid"
-        - "Grumpy Cat"
-        - "This Is Fine"
-        - "Expanding Brain"
-        - "Woman Yelling at Cat"
-        - "Surprised Pikachu"
-        - "Roll Safe"
-        - "Arthur Fist"
-        And many others...
+        prompt = f"""Identify this meme format by analyzing both the visual structure and text content. 
 
-        Text from meme: {ocr_result}
+        VISUAL ANALYSIS (Primary):
+        - Examine the image layout, composition, and visual elements
+        - Look for recognizable faces, objects, or scenes from popular meme templates
+        - Note text positioning (top/bottom, overlay style, speech bubbles, etc.)
+        - Consider color schemes, image quality, and visual style
 
-        If you can identify the specific meme format, respond with the meme name. If you cannot identify it or it's a custom/unknown meme, respond with "Unknown Meme" or "Custom Meme".
+        TEXT ANALYSIS (Secondary):
+        - Analyze the text pattern and structure
+        - Look for characteristic phrases or text formats
+        - Consider how text relates to the visual elements
 
-        Respond with only the meme name, nothing else."""
+        COMMON MEME PATTERNS TO CONSIDER:
+        - Reaction memes (facial expressions + relatable text)
+        - Comparison memes (side-by-side formats like Drake pointing)
+        - Narrative memes (multi-panel storytelling)
+        - Advice/Impact font memes (bold white text on colored backgrounds)  
+        - Modern Twitter/social media screenshot formats
+        - Classic image macro formats
+
+        Text from image: {ocr_result}
+
+        IDENTIFICATION PROCESS:
+        1. First analyze the visual template/format
+        2. Then consider how the text fits the visual pattern
+        3. Match against known meme formats
+
+        RESPONSE FORMAT:
+        - If you can identify a specific, well-known meme format: respond with the exact meme name
+        - If it follows a recognizable pattern but isn't a specific named meme: respond with the pattern type (e.g., "Reaction Meme", "Comparison Meme", "Text Overlay Meme")
+        - If it's completely custom or unrecognizable: respond with "Custom Meme"
+
+        Respond with only the meme name or category, nothing else."""
         
         try:
             response = llm.invoke(prompt)
@@ -192,6 +217,163 @@ def create_meme_name_analysis_node():
             return {**state, "meme_name": "Analysis Failed"}
     
     return meme_name_analysis_node
+
+
+def create_social_media_detection_node():
+    """Create social media platform detection node for identifying the specific platform"""
+    def social_media_detection_node(state):
+        ocr_result = state.get("ocr_result", "")
+        content_type = state.get("content_type", "")
+        
+        # Only analyze social media platform for SOCIAL_MEDIA content
+        if content_type != "SOCIAL_MEDIA" or not ocr_result.strip():
+            logger.info("Skipping social media detection - not social media content or no text")
+            return {**state, "social_media_platform": "N/A"}
+        
+        logger.info("Detecting social media platform...")
+        
+        llm = ChatOpenAI(
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=model_config.get_max_tokens()
+        )
+        
+        prompt = f"""Analyze this social media screenshot and identify the specific platform based on visual and textual cues.
+
+        VISUAL INDICATORS TO LOOK FOR:
+        - UI Layout: button placement, color schemes, design patterns
+        - Typography: font styles, text sizing, formatting
+        - Interface Elements: like buttons, share buttons, reply structures
+        - Avatar/Profile Image positioning and styling
+        - Timestamp formats and positioning
+        - Platform-specific icons and symbols
+
+        PLATFORM-SPECIFIC CHARACTERISTICS:
+        - TWITTER/X: Blue bird icon, @ mentions, RT/retweet, hashtags, "Replying to", character limits, nested reply structure
+        - FACEBOOK: Blue theme, "Like", "Comment", "Share" buttons, reaction emojis, profile pictures on left
+        - INSTAGRAM: Square image format, heart icons, @ mentions, # hashtags, "liked by" text, stories indicators
+        - REDDIT: Upvote/downvote arrows, "r/" subreddit format, "u/" username format, karma points, nested comments with lines
+        - TIKTOK: Vertical video format, @ mentions, # hashtags, like/share/comment icons on right side
+        - LINKEDIN: Professional network styling, "connections", job titles, corporate branding
+        - DISCORD: Dark theme by default, # channel names, @ mentions, timestamps on right, nested server structure
+        - SNAPCHAT: Yellow branding, ghost icons, story indicators
+        - YOUTUBE: Play button, subscribe button, view counts, thumbs up/down
+        - TELEGRAM: Blue theme, @ usernames, forward arrows, channel indicators
+
+        TEXT CONTENT: {ocr_result}
+
+        ANALYSIS PROCESS:
+        1. Examine the visual layout and UI elements visible in the image
+        2. Look for platform-specific text patterns (@ mentions, # hashtags, platform terminology)
+        3. Check for distinctive visual elements (colors, icons, button styles)
+        4. Consider the overall design language and user interface patterns
+
+        RESPONSE: Identify the most likely social media platform. If multiple platforms seem possible, choose the most likely one based on the strongest indicators.
+
+        Respond with only the platform name: TWITTER, FACEBOOK, INSTAGRAM, REDDIT, TIKTOK, LINKEDIN, DISCORD, SNAPCHAT, YOUTUBE, TELEGRAM, or UNKNOWN if unclear."""
+        
+        try:
+            response = llm.invoke(prompt)
+            platform = response.content.strip().upper()
+            
+            # Validate response
+            valid_platforms = ["TWITTER", "FACEBOOK", "INSTAGRAM", "REDDIT", "TIKTOK", "LINKEDIN", "DISCORD", "SNAPCHAT", "YOUTUBE", "TELEGRAM", "UNKNOWN"]
+            if platform not in valid_platforms:
+                platform = "UNKNOWN"
+            
+            # Handle X/Twitter naming
+            if platform == "X":
+                platform = "TWITTER"
+            
+            logger.info(f"Detected platform: {platform}")
+            return {**state, "social_media_platform": platform}
+            
+        except Exception as e:
+            logger.error(f"Social media detection failed: {str(e)}")
+            return {**state, "social_media_platform": "UNKNOWN"}
+    
+    return social_media_detection_node
+
+
+def create_recognise_poster_node():
+    """Create poster recognition node for identifying who posted the social media content"""
+    def recognise_poster_node(state):
+        ocr_result = state.get("ocr_result", "")
+        content_type = state.get("content_type", "")
+        platform = state.get("social_media_platform", "")
+        
+        # Only analyze poster for SOCIAL_MEDIA content
+        if content_type != "SOCIAL_MEDIA" or not ocr_result.strip():
+            logger.info("Skipping poster recognition - not social media content or no text")
+            return {**state, "poster_name": "N/A"}
+        
+        logger.info("Identifying social media poster...")
+        
+        llm = ChatOpenAI(
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=model_config.get_max_tokens()
+        )
+        
+        prompt = f"""Identify the person or account who posted this social media content by analyzing the text and visual elements.
+
+        PLATFORM CONTEXT: {platform}
+        
+        IDENTIFICATION STRATEGIES:
+        
+        VISUAL CUES TO EXAMINE:
+        - Profile/avatar images: Look for recognizable faces, logos, or profile pictures
+        - Username placement: Usually near the top of posts, often bold or prominently displayed
+        - Display names vs usernames: Many platforms show both (e.g., "John Smith @johnsmith")
+        - Verification badges: Blue checkmarks or other verification indicators
+        - Account type indicators: Business accounts, official accounts, etc.
+
+        PLATFORM-SPECIFIC PATTERNS:
+        - TWITTER: "@username" format, display name above username, often "Name @handle"
+        - FACEBOOK: Full names, sometimes with middle names, profile pictures on left
+        - INSTAGRAM: "@username" format, bio information, follower counts
+        - REDDIT: "u/username" format, often anonymous or pseudonymous
+        - TIKTOK: "@username" format, display names, creator badges
+        - LINKEDIN: Professional names, job titles, company affiliations
+        - YOUTUBE: Channel names, subscriber counts, creator verification
+
+        TEXT CONTENT: {ocr_result}
+
+        ANALYSIS PROCESS:
+        1. Look for the primary poster's name/username (not commenters or people mentioned)
+        2. Distinguish between the original poster and any quoted/shared content
+        3. Identify if this is a public figure, brand, organization, or private individual
+        4. Consider context clues like verification status, follower counts, or professional titles
+
+        IDENTIFICATION CRITERIA:
+        - If it's a recognizable public figure (celebrity, politician, journalist, etc.): Provide their real name
+        - If it's a brand/organization: Provide the brand/organization name
+        - If it's a username/handle: Provide the username
+        - If it's unclear or anonymous: Respond with "Anonymous User" or "Unknown User"
+
+        IMPORTANT: Only identify the ORIGINAL POSTER of this content, not people mentioned in comments or replies.
+
+        Respond with only the poster's name or username, nothing else."""
+        
+        try:
+            response = llm.invoke(prompt)
+            poster = response.content.strip()
+            
+            # Clean up response
+            if not poster or len(poster) > 100:
+                poster = "Unknown User"
+            
+            # Remove common prefixes if they appear
+            poster = poster.replace("@", "").replace("u/", "").strip()
+            
+            logger.info(f"Identified poster: {poster}")
+            return {**state, "poster_name": poster}
+            
+        except Exception as e:
+            logger.error(f"Poster recognition failed: {str(e)}")
+            return {**state, "poster_name": "Unknown User"}
+    
+    return recognise_poster_node
 
 
 def create_explain_humor_analysis_node():
@@ -261,9 +443,9 @@ def create_sentiment_analysis_node():
         logger.info("Analyzing sentiment...")
         
         llm = ChatOpenAI(
-            api_key=LLM_API_KEY,
-            model=MODEL,
-            max_tokens=MAX_TOKENS
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=model_config.get_max_tokens()
         )
         
         prompt = f"""Analyze the sentiment of this text and classify it as one of: POSITIVE, NEGATIVE, NEUTRAL
@@ -302,9 +484,9 @@ def create_political_analysis_node():
         logger.info("Analyzing political content...")
         
         llm = ChatOpenAI(
-            api_key=LLM_API_KEY,
-            model=MODEL,
-            max_tokens=MAX_TOKENS
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=model_config.get_max_tokens()
         )
         
         prompt = f"""Analyze if this text contains political content. Political content includes:
@@ -347,9 +529,9 @@ def create_outrage_analysis_node():
         logger.info("Analyzing outrage content...")
         
         llm = ChatOpenAI(
-            api_key=LLM_API_KEY,
-            model=MODEL,
-            max_tokens=MAX_TOKENS
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=model_config.get_max_tokens()
         )
         
         prompt = f"""Analyze if this text is designed to provoke outrage, anger, or strong emotional reactions. Look for:

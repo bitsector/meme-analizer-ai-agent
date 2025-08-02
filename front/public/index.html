@@ -6,74 +6,421 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>OCR File Upload v2.1</title>
+    <title>AI Vision Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-hover: #5855eb;
+            --secondary-color: #f8fafc;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
         }
-        .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            padding: 40px;
+
+        .header {
             text-align: center;
-            margin: 20px 0;
+            margin-bottom: 40px;
+            padding: 20px 0;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: rgba(255,255,255,0.9);
+            font-weight: 300;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .upload-section {
+            padding: 40px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 60px 40px;
+            text-align: center;
             cursor: pointer;
-            transition: border-color 0.3s;
+            transition: var(--transition);
+            background: var(--secondary-color);
+            position: relative;
+            overflow: hidden;
         }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-area:hover::before {
+            left: 100%;
+        }
+
         .upload-area:hover {
-            border-color: #999;
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.05);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
+
         .upload-area.dragover {
-            border-color: #666;
-            background-color: #f5f5f5;
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.1);
+            transform: scale(1.02);
         }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .upload-subtext {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
         #fileInput {
             display: none;
         }
-        .result {
-            margin-top: 20px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            white-space: pre-wrap;
+
+        .status-section {
+            padding: 20px 40px;
+            background: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
         }
+
         .debug {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #e6f3ff;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            color: #0c4a6e;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
         }
+
+        .debug.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .results-section {
+            padding: 40px;
+        }
+
+        .result {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 0;
+            display: none;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-section {
+            margin-bottom: 30px;
+            padding: 25px;
+            background: var(--secondary-color);
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .result-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .result-section h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .result-section h3 i {
+            color: var(--primary-color);
+        }
+
+        .result-content {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .content-type-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-meme { background: #fef3c7; color: #92400e; }
+        .badge-article { background: #dbeafe; color: #1e40af; }
+        .badge-facts { background: #d1fae5; color: #065f46; }
+        .badge-social_media { background: #f3e8ff; color: #7c3aed; }
+        .badge-other { background: #f1f5f9; color: #475569; }
+
+        .sentiment-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .sentiment-positive { background: #dcfce7; color: #166534; }
+        .sentiment-negative { background: #fecaca; color: #dc2626; }
+        .sentiment-neutral { background: #f1f5f9; color: #475569; }
+
         .error {
-            background-color: #ffe6e6;
+            background: #fef2f2;
+            border-color: var(--error-color);
+            color: #dc2626;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .debug-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            transition: var(--transition);
+            font-size: 1.2rem;
+        }
+
+        .debug-toggle:hover {
+            background: var(--primary-hover);
+            transform: scale(1.1);
+        }
+
+        .usage-info {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .usage-info strong {
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .upload-area {
+                padding: 40px 20px;
+            }
+            
+            .results-section,
+            .upload-section {
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>OCR File Upload Service</h1>
-    
-    <div class="upload-area" id="uploadArea">
-        <p>Drag and drop an image file here, or click to select</p>
-        <input type="file" id="fileInput" accept="image/*">
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-eye"></i> AI Vision Analyzer</h1>
+            <p>Upload an image to analyze text, detect content type, and extract insights using AI</p>
+        </div>
+        
+        <div class="main-card">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">Drop your image here</div>
+                    <div class="upload-subtext">or click to browse • PNG, JPG, WEBP, GIF supported</div>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+            </div>
+            
+            <div class="status-section">
+                <div id="debug" class="debug"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing your image with AI...</p>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <div id="result" class="result"></div>
+            </div>
+        </div>
     </div>
     
-    <div id="debug" class="debug" style="display: none;"></div>
-    <div id="result" class="result" style="display: none;"></div>
+    <button class="debug-toggle" id="debugToggle" title="Toggle Debug Info">
+        <i class="fas fa-bug"></i>
+    </button>
 
     <script>
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const debugDiv = document.getElementById('debug');
         const resultDiv = document.getElementById('result');
+        const loadingDiv = document.getElementById('loading');
+        const debugToggle = document.getElementById('debugToggle');
+
+        let debugVisible = false;
 
         function showDebug(message) {
-            debugDiv.style.display = 'block';
-            debugDiv.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+            debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+            if (debugVisible) {
+                debugDiv.classList.add('show');
+            }
         }
+
+        function showLoading() {
+            loadingDiv.classList.add('show');
+            resultDiv.classList.remove('show');
+        }
+
+        function hideLoading() {
+            loadingDiv.classList.remove('show');
+        }
+
+        debugToggle.addEventListener('click', () => {
+            debugVisible = !debugVisible;
+            if (debugVisible) {
+                debugDiv.classList.add('show');
+                debugToggle.innerHTML = '<i class="fas fa-bug-slash"></i>';
+            } else {
+                debugDiv.classList.remove('show');
+                debugToggle.innerHTML = '<i class="fas fa-bug"></i>';
+            }
+        });
 
         uploadArea.addEventListener('click', () => {
             fileInput.click();
@@ -105,6 +452,7 @@
 
         async function handleFile(file) {
             showDebug(`File ${file.name} selected`);
+            showLoading();
             
             const formData = new FormData();
             formData.append('file', file);
@@ -124,52 +472,189 @@
                 const result = await response.json();
                 
                 showDebug(`File ${file.name} processed successfully`);
+                hideLoading();
                 
-                resultDiv.style.display = 'block';
-                
-                let html = '<h3>Extracted Text:</h3>' + result.text;
-                
-                if (result.content_type) {
-                    html += '<h3>Content Type:</h3>' + result.content_type;
-                }
-                
-                if (result.search_results && result.search_results !== "No search performed - content type not suitable for web search") {
-                    html += '<h3>Search Results:</h3>' + result.search_results;
-                }
-                
-                // Meme-specific fields (only show if content type is MEME)
-                if (result.content_type === 'MEME') {
-                    if (result.meme_name && result.meme_name !== 'N/A') {
-                        html += '<h3>Meme Name:</h3>' + result.meme_name;
-                    }
-                    if (result.explain_humor && result.explain_humor !== 'N/A') {
-                        html += '<h3>Humor Explanation:</h3>' + result.explain_humor;
-                    }
-                }
-                
-                // Analysis fields - showing all for debugging
-                html += '<h3>Sentiment Analysis:</h3>' + (result.sentiment || 'NOT SET');
-                html += '<h3>Political Content:</h3>' + (result.is_political || 'NOT SET');
-                html += '<h3>Outrage Content:</h3>' + (result.is_outrage || 'NOT SET');
-                
-                // Debug: Log the full result to console and show in UI
-                console.log('Full backend result:', result);
-                html += '<h3>DEBUG - Full Response:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
-                
-                if (result.usage) {
-                    html += '<h3>Usage:</h3>';
-                    html += `Tokens: ${result.usage.total_tokens} (prompt: ${result.usage.prompt_tokens}, completion: ${result.usage.completion_tokens})<br>`;
-                    html += `Cost: $${result.usage.total_cost.toFixed(6)}`;
-                }
-                
-                resultDiv.innerHTML = html;
+                displayResults(result);
                 
             } catch (error) {
+                hideLoading();
                 showDebug(`Error processing ${file.name}: ${error.message}`);
-                resultDiv.style.display = 'block';
-                resultDiv.className = 'result error';
-                resultDiv.innerHTML = '<h3>Error:</h3>' + error.message;
+                displayError(error.message);
             }
+        }
+
+        function displayResults(result) {
+            resultDiv.classList.add('show');
+            
+            let html = '';
+            
+            // Extracted Text Section
+            if (result.text) {
+                html += `
+                    <div class="result-section">
+                        <h3><i class="fas fa-align-left"></i> Extracted Text</h3>
+                        <div class="result-content">${escapeHtml(result.text)}</div>
+                    </div>
+                `;
+            }
+            
+            // Content Type Section
+            if (result.content_type) {
+                const badgeClass = `badge-${result.content_type.toLowerCase()}`;
+                html += `
+                    <div class="result-section">
+                        <h3><i class="fas fa-tag"></i> Content Type</h3>
+                        <div class="result-content">
+                            <span class="content-type-badge ${badgeClass}">${result.content_type}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Search Results (for ARTICLE/FACTS)
+            if (result.search_results && result.search_results !== "No search performed - content type not suitable for web search" && !result.search_results.includes("No search performed")) {
+                html += `
+                    <div class="result-section">
+                        <h3><i class="fas fa-search"></i> Search Results</h3>
+                        <div class="result-content">${escapeHtml(result.search_results)}</div>
+                    </div>
+                `;
+            }
+            
+            // Meme-specific fields
+            if (result.content_type === 'MEME') {
+                if (result.meme_name && result.meme_name !== 'N/A') {
+                    html += `
+                        <div class="result-section">
+                            <h3><i class="fas fa-laugh"></i> Meme Format</h3>
+                            <div class="result-content">${escapeHtml(result.meme_name)}</div>
+                        </div>
+                    `;
+                }
+                if (result.explain_humor && result.explain_humor !== 'N/A') {
+                    html += `
+                        <div class="result-section">
+                            <h3><i class="fas fa-smile-beam"></i> Humor Analysis</h3>
+                            <div class="result-content">${escapeHtml(result.explain_humor)}</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Social media-specific fields
+            if (result.content_type === 'SOCIAL_MEDIA') {
+                if (result.social_media_platform && result.social_media_platform !== 'N/A') {
+                    html += `
+                        <div class="result-section">
+                            <h3><i class="fas fa-share-alt"></i> Platform</h3>
+                            <div class="result-content">${escapeHtml(result.social_media_platform)}</div>
+                        </div>
+                    `;
+                }
+                if (result.poster_name && result.poster_name !== 'N/A') {
+                    html += `
+                        <div class="result-section">
+                            <h3><i class="fas fa-user"></i> Posted By</h3>
+                            <div class="result-content">${escapeHtml(result.poster_name)}</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Sentiment Analysis
+            if (result.sentiment) {
+                const sentimentClass = `sentiment-${result.sentiment.toLowerCase()}`;
+                html += `
+                    <div class="result-section">
+                        <h3><i class="fas fa-heart"></i> Sentiment</h3>
+                        <div class="result-content">
+                            <span class="sentiment-badge ${sentimentClass}">${result.sentiment}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Political Content
+            if (result.is_political) {
+                const icon = result.is_political === 'YES' ? 'fas fa-flag' : 'fas fa-flag-usa';
+                html += `
+                    <div class="result-section">
+                        <h3><i class="${icon}"></i> Political Content</h3>
+                        <div class="result-content">${result.is_political}</div>
+                    </div>
+                `;
+            }
+            
+            // Outrage Content
+            if (result.is_outrage) {
+                const icon = result.is_outrage === 'YES' ? 'fas fa-exclamation-triangle' : 'fas fa-check-circle';
+                html += `
+                    <div class="result-section">
+                        <h3><i class="${icon}"></i> Outrage Content</h3>
+                        <div class="result-content">${result.is_outrage}</div>
+                    </div>
+                `;
+            }
+            
+            // Usage Info
+            if (result.usage && result.usage.total_tokens) {
+                html += `
+                    <div class="result-section">
+                        <h3><i class="fas fa-chart-bar"></i> API Usage</h3>
+                        <div class="result-content">
+                            <div class="usage-info">
+                                <strong>Tokens:</strong> ${result.usage.total_tokens} 
+                                (${result.usage.prompt_tokens} prompt, ${result.usage.completion_tokens} completion)<br>
+                                <strong>Cost:</strong> $${result.usage.total_cost ? result.usage.total_cost.toFixed(6) : '0.000000'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultDiv.innerHTML = html;
+            
+            // Log full result for debugging
+            console.log('Full backend result:', result);
+            showDebug('Analysis complete - results displayed');
+        }
+
+        function displayError(message) {
+            resultDiv.classList.add('show');
+            
+            let errorContent = escapeHtml(message);
+            let solutions = '';
+            
+            // Check for specific error types and provide solutions
+            if (message.includes('unsupported_country_region_territory') || message.includes('not available in your region')) {
+                solutions = `
+                    <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <h4 style="margin: 0 0 10px 0; color: #92400e;"><i class="fas fa-lightbulb"></i> Possible Solutions:</h4>
+                        <ul style="margin: 0; color: #92400e;">
+                            <li>Use a VPN to connect from a supported country</li>
+                            <li>Try Azure OpenAI service instead</li>
+                            <li>Use Google Gemini or other vision APIs</li>
+                            <li>Check <a href="https://platform.openai.com/docs/supported-countries" target="_blank">OpenAI's supported countries</a></li>
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="result-section error">
+                    <h3><i class="fas fa-exclamation-circle"></i> Error</h3>
+                    <div class="result-content">
+                        ${errorContent}
+                        ${solutions}
+                    </div>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>

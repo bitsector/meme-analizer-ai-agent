@@ -35,6 +35,8 @@ async def analyze_file(file: UploadFile = File(...)):
             "search_results": result["search_results"],
             "meme_name": result["meme_name"],
             "explain_humor": result["explain_humor"],
+            "social_media_platform": result["social_media_platform"],
+            "poster_name": result["poster_name"],
             "sentiment": result["sentiment"],
             "is_political": result["is_political"],
             "is_outrage": result["is_outrage"],
@@ -42,7 +44,14 @@ async def analyze_file(file: UploadFile = File(...)):
         }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        if "unsupported_country_region_territory" in error_msg:
+            raise HTTPException(
+                status_code=403, 
+                detail="OpenAI API is not available in your region. Please use a VPN or contact support for alternative solutions."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/")
 async def root():

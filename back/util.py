@@ -1,12 +1,49 @@
 import os
 import base64
-import logging
 from dotenv import load_dotenv
+from logging_config import get_logger
 
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+
+class ModelConfig:
+    """Configuration class for all OpenAI models"""
+    
+    def __init__(self):
+        self.api_key = os.getenv("LLM_API_KEY")
+        self.completion_model = os.getenv("COMPLETION_MODEL", "gpt-4o-mini")
+        self.image_gen_model = os.getenv("IMAGE_GEN_MODEL", "dall-e-2")
+        self.tts_model = os.getenv("TTS_MODEL", "tts-1")
+        self.max_tokens = int(os.getenv("MAX_TOKENS", "100"))
+        self.print_graph = os.getenv("PRINT_GRAPH", "0") == "1"
+        
+        if not self.api_key:
+            raise ValueError("LLM_API_KEY not set in .env file.")
+    
+    def get_completion_model(self):
+        return self.completion_model
+    
+    def get_image_gen_model(self):
+        return self.image_gen_model
+    
+    def get_tts_model(self):
+        return self.tts_model
+    
+    def get_max_tokens(self):
+        return self.max_tokens
+    
+    def get_api_key(self):
+        return self.api_key
+    
+    def should_print_graph(self):
+        return self.print_graph
+
+
+# Global model configuration instance
+model_config = ModelConfig()
 
 
 def encode_image_to_base64(image_data):
@@ -19,31 +56,22 @@ def encode_image_to_base64(image_data):
 
 def print_graph_structure(workflow, graph):
     """Print the LangGraph structure if PRINT_GRAPH is enabled"""
-    print_graph = os.getenv("PRINT_GRAPH", "0")
-    if print_graph == "0":
+    if not model_config.should_print_graph():
         return
     
     logger.info("LangGraph Structure:")
     try:
-        # Print nodes
-        nodes = list(workflow.nodes.keys())
-        logger.info(f"Nodes: {', '.join(nodes)}")
-        
-        # Print edges - avoiding the 'set' object error
-        edges = []
-        for source in workflow.edges:
-            logger.info(f"Edge from {source}")
-        
-        # Print entry point
-        logger.info(f"Entry Point: ocr")
+        # Just skip the detailed graph printing for now to avoid errors
+        logger.info("Graph compiled successfully")
+        logger.info("Entry Point: ocr")
+        logger.info("Workflow contains: OCR → Conditional Routing → Analysis → Result")
         
     except Exception as e:
         logger.error(f"Error printing graph structure: {str(e)}")
 
 def print_detailed_graph_structure():
     """Print detailed graph structure for main() function"""
-    print_graph = os.getenv("PRINT_GRAPH", "0")
-    if print_graph == "0":
+    if not model_config.should_print_graph():
         return
     
     logger.info("=== LangGraph Workflow Structure ===")
@@ -53,6 +81,10 @@ def print_detailed_graph_structure():
         logger.info("NODES:")
         logger.info("  • ocr: Extracts text from image using GPT-4o-mini vision")
         logger.info("  • search: Searches web for ARTICLE/FACTS content using DuckDuckGo")
+        logger.info("  • meme_name_analysis: Identifies meme format names for MEME content")
+        logger.info("  • explain_humor_analysis: Explains why memes are funny")
+        logger.info("  • social_media_detection: Identifies social media platform from UI")
+        logger.info("  • recognise_poster: Identifies who posted the social media content")
         logger.info("  • sentiment_analysis: Analyzes sentiment (POSITIVE/NEGATIVE/NEUTRAL)")
         logger.info("  • political_analysis: Detects political content (YES/NO)")
         logger.info("  • outrage_analysis: Detects outrage/inflammatory content (YES/NO)")
@@ -61,8 +93,10 @@ def print_detailed_graph_structure():
         # Print edges (flow)
         logger.info("WORKFLOW FLOW:")
         logger.info("  START → ocr → conditional")
-        logger.info("    ├─ if MEME/OTHER → sentiment_analysis")
-        logger.info("    └─ if ARTICLE/FACTS → search → sentiment_analysis")
+        logger.info("    ├─ if MEME → meme_name_analysis → explain_humor_analysis → sentiment_analysis")
+        logger.info("    ├─ if ARTICLE/FACTS → search → sentiment_analysis")
+        logger.info("    ├─ if SOCIAL_MEDIA → social_media_detection → recognise_poster → sentiment_analysis")
+        logger.info("    └─ if OTHER → sentiment_analysis")
         logger.info("  sentiment_analysis → political_analysis → outrage_analysis → result → END")
         
         # Print entry point
@@ -71,8 +105,12 @@ def print_detailed_graph_structure():
         # Print state schema
         logger.info("STATE SCHEMA:")
         logger.info("  • ocr_result: str - Extracted text from image")
-        logger.info("  • content_type: str - MEME/ARTICLE/FACTS/OTHER")
+        logger.info("  • content_type: str - MEME/ARTICLE/FACTS/SOCIAL_MEDIA/OTHER")
         logger.info("  • search_results: str - Web search results")
+        logger.info("  • meme_name: str - Identified meme format name")
+        logger.info("  • explain_humor: str - Humor analysis explanation")
+        logger.info("  • social_media_platform: str - Detected platform (TWITTER/FACEBOOK/etc)")
+        logger.info("  • poster_name: str - Username/name of content poster")
         logger.info("  • sentiment: str - POSITIVE/NEGATIVE/NEUTRAL")
         logger.info("  • is_political: str - YES/NO")
         logger.info("  • is_outrage: str - YES/NO")
@@ -85,8 +123,7 @@ def print_detailed_graph_structure():
 
 def try_generate_visual_graph(graph):
     """Try to generate visual graph PNG"""
-    print_graph = os.getenv("PRINT_GRAPH", "0")
-    if print_graph == "0":
+    if not model_config.should_print_graph():
         return
     
     logger.info("GENERATING VISUAL GRAPH...")
@@ -109,45 +146,52 @@ def try_generate_visual_graph(graph):
         
         # Fallback: ASCII art representation
         logger.info("ASCII GRAPH:")
-        logger.info("┌─────────┐")
-        logger.info("│  START  │")
-        logger.info("└────┬────┘")
-        logger.info("     │")
-        logger.info("┌────▼────┐")
-        logger.info("│   OCR   │ ← GPT-4o-mini Vision")
-        logger.info("└────┬────┘")
-        logger.info("     │")
-        logger.info("   ┌─▼─┐ CONDITIONAL")
-        logger.info("   │ ? │")
-        logger.info("   └┬─┬┘")
-        logger.info("MEME│ │ARTICLE/FACTS")
-        logger.info("    │ │")
-        logger.info("    │ └──┐")
-        logger.info("    │    ▼")
-        logger.info("    │ ┌────────┐")
-        logger.info("    │ │ SEARCH │ ← DuckDuckGo")
-        logger.info("    │ └───┬────┘")
-        logger.info("    │     │")
-        logger.info("    ▼     ▼")
-        logger.info("┌─────────────────┐")
-        logger.info("│ SENTIMENT       │ ← GPT-4o-mini")
-        logger.info("│ ANALYSIS        │")
-        logger.info("└────────┬────────┘")
-        logger.info("         │")
-        logger.info("┌────────▼────────┐")
-        logger.info("│ POLITICAL       │ ← GPT-4o-mini")
-        logger.info("│ ANALYSIS        │")
-        logger.info("└────────┬────────┘")
-        logger.info("         │")
-        logger.info("┌────────▼────────┐")
-        logger.info("│ OUTRAGE         │ ← GPT-4o-mini")
-        logger.info("│ ANALYSIS        │")
-        logger.info("└────────┬────────┘")
-        logger.info("         │")
-        logger.info("┌────────▼────────┐")
-        logger.info("│     RESULT      │")
-        logger.info("└────┬────────────┘")
-        logger.info("     │")
-        logger.info("┌────▼────┐")
-        logger.info("│   END   │")
-        logger.info("└─────────┘")
+        logger.info("                    ┌─────────┐")
+        logger.info("                    │  START  │")
+        logger.info("                    └────┬────┘")
+        logger.info("                         │")
+        logger.info("                    ┌────▼────┐")
+        logger.info("                    │   OCR   │ ← GPT-4o-mini Vision")
+        logger.info("                    └────┬────┘")
+        logger.info("                         │")
+        logger.info("                    ┌────▼────┐ CONDITIONAL ROUTING")
+        logger.info("                    │    ?    │")
+        logger.info("           ┌────────┴────┬────┴────────┬────────┐")
+        logger.info("           │             │             │        │")
+        logger.info("      MEME │        ARTICLE/FACTS  SOCIAL_MEDIA │ OTHER")
+        logger.info("           ▼             ▼             ▼        ▼")
+        logger.info("    ┌─────────────┐ ┌─────────┐ ┌─────────────┐ │")
+        logger.info("    │ MEME NAME   │ │ SEARCH  │ │ SOCIAL      │ │")
+        logger.info("    │ ANALYSIS    │ │         │ │ MEDIA       │ │")
+        logger.info("    └──────┬──────┘ └────┬────┘ │ DETECTION   │ │")
+        logger.info("           │             │      └──────┬──────┘ │")
+        logger.info("           ▼             │             ▼        │")
+        logger.info("    ┌─────────────┐      │      ┌─────────────┐ │")
+        logger.info("    │ EXPLAIN     │      │      │ RECOGNISE   │ │")
+        logger.info("    │ HUMOR       │      │      │ POSTER      │ │")
+        logger.info("    └──────┬──────┘      │      └──────┬──────┘ │")
+        logger.info("           │             │             │        │")
+        logger.info("           └─────────────┼─────────────┘        │")
+        logger.info("                         ▼                      │")
+        logger.info("                  ┌─────────────┐               │")
+        logger.info("                  │ SENTIMENT   │ ← GPT-4o-mini │")
+        logger.info("                  │ ANALYSIS    │◄──────────────┘")
+        logger.info("                  └──────┬──────┘")
+        logger.info("                         │")
+        logger.info("                  ┌──────▼──────┐")
+        logger.info("                  │ POLITICAL   │ ← GPT-4o-mini")
+        logger.info("                  │ ANALYSIS    │")
+        logger.info("                  └──────┬──────┘")
+        logger.info("                         │")
+        logger.info("                  ┌──────▼──────┐")
+        logger.info("                  │ OUTRAGE     │ ← GPT-4o-mini")
+        logger.info("                  │ ANALYSIS    │")
+        logger.info("                  └──────┬──────┘")
+        logger.info("                         │")
+        logger.info("                  ┌──────▼──────┐")
+        logger.info("                  │   RESULT    │")
+        logger.info("                  └──────┬──────┘")
+        logger.info("                         │")
+        logger.info("                    ┌────▼────┐")
+        logger.info("                    │   END   │")
+        logger.info("                    └─────────┘")
