@@ -391,8 +391,8 @@ def create_explain_humor_analysis_node():
         logger.info("Explaining meme humor...")
         
         llm = ChatOpenAI(
-            api_key=LLM_API_KEY,
-            model=MODEL,
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
             max_tokens=200  # More tokens for detailed explanation
         )
         

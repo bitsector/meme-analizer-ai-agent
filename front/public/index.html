@@ -328,6 +328,75 @@
             color: var(--text-primary);
         }
 
+        .image-preview {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--secondary-color);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .preview-header h4 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .preview-header h4 i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+
+        .remove-image {
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remove-image:hover {
+            background: #dc2626;
+            transform: scale(1.1);
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            display: block;
+            margin: 0 auto;
+        }
+
+        .image-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -365,6 +434,18 @@
                     <div class="upload-subtext">or click to browse • PNG, JPG, WEBP, GIF supported</div>
                     <input type="file" id="fileInput" accept="image/*">
                 </div>
+                
+                <!-- Image Preview Section -->
+                <div class="image-preview" id="imagePreview" style="display: none;">
+                    <div class="preview-header">
+                        <h4><i class="fas fa-image"></i> Uploaded Image</h4>
+                        <button class="remove-image" id="removeImage" title="Remove Image">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <img id="previewImg" src="" alt="Uploaded preview" />
+                    <div class="image-info" id="imageInfo"></div>
+                </div>
             </div>
             
             <div class="status-section">
@@ -392,6 +473,10 @@
         const resultDiv = document.getElementById('result');
         const loadingDiv = document.getElementById('loading');
         const debugToggle = document.getElementById('debugToggle');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const imageInfo = document.getElementById('imageInfo');
+        const removeImageBtn = document.getElementById('removeImage');
 
         let debugVisible = false;
 
@@ -439,19 +524,70 @@
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
+            
+            if (files.length > 1) {
+                showError("One image at a time, please!");
+                return;
+            }
+            
             if (files.length > 0) {
                 handleFile(files[0]);
             }
         });
 
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
+            const files = e.target.files;
+            
+            if (files.length > 1) {
+                showError("One image at a time, please!");
+                e.target.value = ''; // Clear the input
+                return;
             }
+            
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function showError(message) {
+            showDebug(`ERROR: ${message}`);
+            displayError(message);
+        }
+
+        function showImagePreview(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                imageInfo.innerHTML = `
+                    <strong>File:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${(file.size / 1024).toFixed(1)} KB<br>
+                    <strong>Type:</strong> ${file.type}
+                `;
+                imagePreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function hideImagePreview() {
+            imagePreview.style.display = 'none';
+            previewImg.src = '';
+            imageInfo.innerHTML = '';
+            fileInput.value = ''; // Clear file input
+        }
+
+        // Remove image button functionality
+        removeImageBtn.addEventListener('click', () => {
+            hideImagePreview();
+            resultDiv.classList.remove('show');
+            showDebug('Image removed');
         });
 
         async function handleFile(file) {
             showDebug(`File ${file.name} selected`);
+            
+            // Show image preview immediately
+            showImagePreview(file);
+            
             showLoading();
             
             const formData = new FormData();
