@@ -144,6 +144,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Secrets directory
+secrets/
+
 # Node.js dependencies
 node_modules/
 
