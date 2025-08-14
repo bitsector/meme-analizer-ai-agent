@@ -147,13 +147,18 @@ venv.bak/
 # Secrets directory
 secrets/
 
+# Firebase
+.firebase/
+public/
+
 # Terraform
 terraform/.terraform/
 terraform/.terraform.lock.hcl
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
+terraform/terraform.tfstate*
 terraform/terraform.tfvars
 terraform/*.tfplan
+*.tfstate
+*.tfstate.*
 
 # Node.js dependencies
 node_modules/
