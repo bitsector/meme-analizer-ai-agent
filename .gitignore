@@ -147,6 +147,14 @@ venv.bak/
 # Secrets directory
 secrets/
 
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/*.tfplan
+
 # Node.js dependencies
 node_modules/
 

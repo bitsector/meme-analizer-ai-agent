@@ -2,11 +2,15 @@ version: '3.8'
 
 services:
   backend:
-    image: antonbiz/agent-back:1.0
+    build:
+      context: ./back
+      dockerfile: Dockerfile.back
     ports:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+    secrets:
+      - open_api_key
     networks:
       - app-network
 
@@ -24,3 +28,7 @@ services:
 networks:
   app-network:
     driver: bridge
+
+secrets:
+  open_api_key:
+    file: ./secrets/open_api_key.txt

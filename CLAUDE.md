@@ -1,0 +1,1 @@
+- no docker push - we have secrets in that conainer

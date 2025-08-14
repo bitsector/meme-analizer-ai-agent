@@ -1,5 +1,6 @@
 import os
 import base64
+from pathlib import Path
 from dotenv import load_dotenv
 from logging_config import get_logger
 
@@ -9,19 +10,46 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
+def get_secret(secret_name: str) -> str:
+    """Read secret from file or environment variable"""
+    # Try file-based secret first (Docker/Cloud Run volumes)
+    secret_file = f"/run/secrets/{secret_name}"
+    if os.path.exists(secret_file):
+        logger.debug(f"Reading secret {secret_name} from file: {secret_file}")
+        return Path(secret_file).read_text().strip()
+    
+    # Fallback to environment variable (uppercase)
+    env_value = os.getenv(secret_name.upper())
+    if env_value:
+        logger.debug(f"Reading secret {secret_name} from environment variable")
+        return env_value
+    
+    # Try original case for backward compatibility
+    env_value = os.getenv(secret_name)
+    if env_value:
+        logger.debug(f"Reading secret {secret_name} from environment variable (original case)")
+        return env_value
+    
+    raise ValueError(f"Secret {secret_name} not found in file (/run/secrets/{secret_name}) or environment")
+
+
 class ModelConfig:
     """Configuration class for all OpenAI models"""
     
     def __init__(self):
-        self.api_key = os.getenv("LLM_API_KEY")
+        try:
+            self.api_key = get_secret("open_api_key")
+        except ValueError:
+            # Fallback for backward compatibility
+            self.api_key = os.getenv("LLM_API_KEY")
+            if not self.api_key:
+                raise ValueError("LLM_API_KEY not found in secrets or environment variables")
+        
         self.completion_model = os.getenv("COMPLETION_MODEL", "gpt-4o-mini")
         self.image_gen_model = os.getenv("IMAGE_GEN_MODEL", "dall-e-2")
         self.tts_model = os.getenv("TTS_MODEL", "tts-1")
         self.max_tokens = int(os.getenv("MAX_TOKENS", "100"))
         self.print_graph = os.getenv("PRINT_GRAPH", "0") == "1"
-        
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY not set in .env file.")
     
     def get_completion_model(self):
         return self.completion_model

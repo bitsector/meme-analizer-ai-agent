@@ -1,0 +1,11 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+# Required variables
+project_id      = "your-unique-project-id"  # Must be globally unique
+billing_account = "your-billing-account-id" # Find at: https://console.cloud.google.com/billing
+
+# Optional variables (uncomment and modify if needed)
+# project_name = "Firebase Project"
+# region       = "us-central1"
+# environment  = "dev"
+# org_id       = "your-org-id"  # Only needed if using organization account
