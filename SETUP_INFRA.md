@@ -20,7 +20,7 @@ This document describes how to deploy and manage the meme-analyzer-ai-agent infr
 
 ## Full Deployment (Day 1 or after terraform destroy)
 
-### 1. Deploy Infrastructure
+### 1. Deploy Infrastructure First
 ```bash
 cd terraform
 terraform init
@@ -28,33 +28,38 @@ terraform plan
 terraform apply
 ```
 
-### 2. Add Secret Value to Google Secret Manager
-```bash
-# Add the OpenAI API key to the secret
-cat ../secrets/open_api_key.txt | gcloud secrets versions add open-api-key --data-file=-
-```
+This creates:
+- ✅ All GCP infrastructure
+- ✅ Artifact Registry (for Docker images)
+- ✅ Firebase project and Hosting site
+- ✅ Cloud Run service (with placeholder image)
+- ✅ Secret Manager (empty secret)
+- ✅ All permissions and service accounts
 
-### 3. Build and Push Backend Image
+### 2. Build and Push Backend Image
 ```bash
 cd ..  # Back to project root
 
 # Build backend image
-docker build -f back/Dockerfile.back -t us-central1-docker.pkg.dev/gcp-cloud-run-tests/backend-images/agent-back:latest ./back
+docker build \
+  -f back/Dockerfile.back \
+  -t us-central1-docker.pkg.dev/gcp-cloud-run-tests/backend-images/agent-back:latest \
+  ./back
 
-# Push to Artifact Registry
-docker push us-central1-docker.pkg.dev/gcp-cloud-run-tests/backend-images/agent-back:latest
+# Push to Artifact Registry (now exists)
+docker push \
+  us-central1-docker.pkg.dev/gcp-cloud-run-tests/backend-images/agent-back:latest
 ```
 
-### 4. Update Cloud Run with New Image
+### 3. Add Secret Value and Final Update
 ```bash
+# Add the OpenAI API key to the secret
+cat secrets/open_api_key.txt | \
+  gcloud secrets versions add open-api-key --data-file=-
+
+# Update Cloud Run with real image and deploy frontend
 cd terraform
 terraform apply
-```
-
-### 5. Deploy Frontend (if needed)
-```bash
-cd ..  # Back to project root
-firebase deploy --only hosting
 ```
 
 ## Daily Shutdown (Save Costs)
@@ -111,10 +116,22 @@ Follow the "Full Deployment" steps above.
 
 Build and run locally with Docker Compose:
 ```bash
-# Build and run both frontend and backend
-docker compose down && \
-docker build -f back/Dockerfile.back -t antonbiz/agent-back:1.0 ./back && \
-docker build -f front/Dockerfile.front -t antonbiz/agent-front:1.0 ./front && \
+# Stop any running containers
+docker compose down
+
+# Build backend image
+docker build \
+  -f back/Dockerfile.back \
+  -t antonbiz/agent-back:1.0 \
+  ./back
+
+# Build frontend image
+docker build \
+  -f front/Dockerfile.front \
+  -t antonbiz/agent-front:1.0 \
+  ./front
+
+# Start all services
 docker compose up --build
 ```
 
@@ -137,13 +154,15 @@ terraform output
 ### Secret Not Found Error
 Make sure you've added the secret value:
 ```bash
-cat ../secrets/open_api_key.txt | gcloud secrets versions add open-api-key --data-file=-
+cat ../secrets/open_api_key.txt | \
+  gcloud secrets versions add open-api-key --data-file=-
 ```
 
 ### Docker Push Permission Denied
 Authenticate Docker with Google Cloud:
 ```bash
-gcloud auth configure-docker us-central1-docker.pkg.dev
+gcloud auth configure-docker \
+  us-central1-docker.pkg.dev
 ```
 
 ### Firebase Deploy Issues

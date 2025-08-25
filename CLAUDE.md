@@ -1,1 +1,2 @@
 - no docker push - we have secrets in that conainer
+- I'm going to sleep, when I start workin again on thie psoject you are to remind me that where we stopped is where firebase works nad we can see the FE and we didn't yet try to push and load the BE. And thank you for your help

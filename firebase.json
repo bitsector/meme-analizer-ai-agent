@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "target": "meme-analyzer-app",
     "public": "front/public",
     "ignore": [
       "firebase.json",

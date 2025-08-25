@@ -49,22 +49,25 @@ resource "google_project_service" "apis" {
   disable_on_destroy         = false
 }
 
-# Firebase resources commented out due to permission issues
-# Uncomment and run again once Firebase Admin role is properly configured
+# Enable Firebase on the project
+resource "google_firebase_project" "default" {
+  provider = google-beta
+  project  = data.google_project.project.project_id
+  depends_on = [
+    google_project_service.apis["firebase.googleapis.com"],
+  ]
+}
 
-# resource "google_firebase_project" "default" {
-#   provider = google-beta
-#   project  = data.google_project.project.project_id
-#   depends_on = [
-#     google_project_service.apis["firebase.googleapis.com"],
-#   ]
-# }
-
-# resource "google_firebase_hosting_site" "default" {
-#   provider = google-beta
-#   project  = data.google_project.project.project_id
-#   site_id  = var.project_id
-# }
+# Create Firebase Hosting site
+resource "google_firebase_hosting_site" "default" {
+  provider = google-beta
+  project  = data.google_project.project.project_id
+  site_id  = "meme-analyzer-app"
+  depends_on = [
+    google_firebase_project.default,
+    google_project_service.apis["firebasehosting.googleapis.com"],
+  ]
+}
 
 # Create Artifact Registry for Docker images
 resource "google_artifact_registry_repository" "backend_repo" {
@@ -164,6 +167,25 @@ resource "google_cloud_run_service" "backend" {
     google_artifact_registry_repository.backend_repo,
     google_secret_manager_secret_iam_member.backend_secret_access,
   ]
+}
+
+# Deploy frontend to Firebase Hosting
+resource "null_resource" "firebase_deploy" {
+  depends_on = [google_firebase_hosting_site.default]
+  
+  triggers = {
+    # Redeploy when frontend files change
+    frontend_hash = filemd5("${path.module}/../front/public/index.html")
+    site_id = google_firebase_hosting_site.default.site_id
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cd ${path.module}/..
+      firebase use ${google_firebase_project.default.project}
+      firebase deploy --only hosting:${google_firebase_hosting_site.default.site_id} --non-interactive
+    EOT
+  }
 }
 
 # Allow unauthenticated access to Cloud Run service

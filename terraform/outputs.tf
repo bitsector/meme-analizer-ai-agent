@@ -8,16 +8,20 @@ output "project_number" {
   value       = data.google_project.project.number
 }
 
-# Firebase outputs commented out due to permission issues
-# output "firebase_project_id" {
-#   description = "The Firebase project ID"
-#   value       = google_firebase_project.default.project
-# }
+output "firebase_project_id" {
+  description = "The Firebase project ID"
+  value       = google_firebase_project.default.project
+}
 
-# output "firebase_hosting_site_id" {
-#   description = "The Firebase Hosting site ID"
-#   value       = google_firebase_hosting_site.default.site_id
-# }
+output "firebase_hosting_site_id" {
+  description = "The Firebase Hosting site ID"
+  value       = google_firebase_hosting_site.default.site_id
+}
+
+output "firebase_hosting_url" {
+  description = "The Firebase Hosting URL"
+  value       = "https://${google_firebase_hosting_site.default.site_id}.web.app"
+}
 
 output "cloud_run_backend_url" {
   description = "The Cloud Run backend service URL"
