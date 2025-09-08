@@ -3,10 +3,47 @@ from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
 from langchain_core.messages import HumanMessage
+from langchain_core.callbacks import BaseCallbackHandler
 from util import encode_image_to_base64, model_config
 from logging_config import get_logger
+import tiktoken
 
 logger = get_logger(__name__)
+
+
+class GeminiUsageTracker:
+    """Simple token usage tracker for Gemini models"""
+    
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_tokens = 0
+        self.total_cost = 0.0
+    
+    def estimate_tokens(self, text):
+        """Rough token estimation (4 chars = 1 token)"""
+        return len(str(text)) // 4
+    
+    def calculate_gemini_cost(self, prompt_tokens, completion_tokens):
+        """Calculate cost for Gemini 1.5 Flash"""
+        # Gemini 1.5 Flash pricing (per 1M tokens)
+        input_cost_per_million = 0.075  # $0.075 per 1M input tokens
+        output_cost_per_million = 0.30  # $0.30 per 1M output tokens
+        
+        input_cost = (prompt_tokens / 1_000_000) * input_cost_per_million
+        output_cost = (completion_tokens / 1_000_000) * output_cost_per_million
+        
+        return input_cost + output_cost
+    
+    def track_usage(self, prompt, response):
+        """Track usage for a prompt/response pair"""
+        self.prompt_tokens = self.estimate_tokens(prompt)
+        self.completion_tokens = self.estimate_tokens(response)
+        self.total_tokens = self.prompt_tokens + self.completion_tokens
+        self.total_cost = self.calculate_gemini_cost(self.prompt_tokens, self.completion_tokens)
 
 
 def get_llm_instance(max_tokens=None):
@@ -51,20 +88,34 @@ def create_ocr_node(image_data):
         ]
         llm = get_llm_instance(max_tokens=512)
         try:
-            with get_openai_callback() as cb:
+            if model_config.get_llm_provider() == "openai":
+                with get_openai_callback() as cb:
+                    response = llm.invoke(prompt)
+                    cb_info = {
+                        "prompt_tokens": cb.prompt_tokens,
+                        "completion_tokens": cb.completion_tokens,
+                        "total_tokens": cb.total_tokens,
+                        "total_cost": cb.total_cost,
+                    }
+            else:  # Gemini
+                gemini_tracker = GeminiUsageTracker()
                 response = llm.invoke(prompt)
+                # Convert prompt to string for token estimation
+                prompt_str = str(prompt)
+                gemini_tracker.track_usage(prompt_str, response.content)
                 cb_info = {
-                    "prompt_tokens": cb.prompt_tokens,
-                    "completion_tokens": cb.completion_tokens,
-                    "total_tokens": cb.total_tokens,
-                    "total_cost": cb.total_cost,
+                    "prompt_tokens": gemini_tracker.prompt_tokens,
+                    "completion_tokens": gemini_tracker.completion_tokens,
+                    "total_tokens": gemini_tracker.total_tokens,
+                    "total_cost": gemini_tracker.total_cost,
                 }
         except Exception as e:
             error_msg = str(e)
+            provider = model_config.get_llm_provider().upper()
             if "unsupported_country_region_territory" in error_msg or "403" in error_msg:
-                logger.error("OpenAI API is not available in your region. Please use a VPN or try Azure OpenAI.")
+                logger.error(f"{provider} API is not available in your region. Please use a VPN or try alternative solutions.")
                 return {
-                    "ocr_result": "Error: OpenAI API blocked in your region", 
+                    "ocr_result": f"Error: {provider} API blocked in your region", 
                     "content_type": "ERROR",
                     "search_results": "",
                     "meme_name": "",
@@ -97,7 +148,8 @@ def create_ocr_node(image_data):
             content_type = "OTHER"
         
         # Log usage info
-        logger.info(f"Usage: {cb.total_tokens} tokens (prompt: {cb.prompt_tokens}, completion: {cb.completion_tokens}), cost: ${cb.total_cost:.6f}")
+        provider = model_config.get_llm_provider().upper()
+        logger.info(f"{provider} Usage: {cb_info['total_tokens']} tokens (prompt: {cb_info['prompt_tokens']}, completion: {cb_info['completion_tokens']}), cost: ${cb_info['total_cost']:.6f}")
         
         # Log extracted text and classification
         logger.debug(f"Extracted text:\n{ocr_result}")
