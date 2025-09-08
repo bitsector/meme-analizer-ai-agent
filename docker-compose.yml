@@ -9,6 +9,10 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-common}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
     secrets:
       - open_api_key
     networks:

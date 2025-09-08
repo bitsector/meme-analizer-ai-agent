@@ -15,8 +15,8 @@ RUN apt-get update && \
 # Copy package files first for better Docker layer caching
 COPY package*.json ./
 
-# Install dependencies with npm ci for production builds
-RUN npm ci --only=production && \
+# Install dependencies (use npm install to handle new dependencies)
+RUN npm install --only=production && \
     npm cache clean --force
 
 # Copy application code
