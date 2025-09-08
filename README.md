@@ -99,6 +99,9 @@ docker compose down
 
 # Rebuild and start (after code changes)
 docker compose up --build
+
+# Or in short:
+docker compose down && docker build -f back/Dockerfile.back -t antonbiz/agent-back:1.0 ./back && docker build -f front/Dockerfile.front -t antonbiz/agent-front:1.0 ./front && docker compose up
 ```
 
 The application will be available at:

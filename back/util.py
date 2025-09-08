@@ -34,20 +34,39 @@ def get_secret(secret_name: str) -> str:
 
 
 class ModelConfig:
-    """Configuration class for all OpenAI models"""
+    """Configuration class for all LLM models"""
     
     def __init__(self):
-        try:
-            self.api_key = get_secret("open_api_key")
-        except ValueError:
-            # Fallback for backward compatibility
-            self.api_key = os.getenv("LLM_API_KEY")
-            if not self.api_key:
-                raise ValueError("LLM_API_KEY not found in secrets or environment variables")
+        self.llm_provider = os.getenv("LLM_PROVIDER", "openai").lower()
         
-        self.completion_model = os.getenv("COMPLETION_MODEL", "gpt-4o-mini")
-        self.image_gen_model = os.getenv("IMAGE_GEN_MODEL", "dall-e-2")
-        self.tts_model = os.getenv("TTS_MODEL", "tts-1")
+        if self.llm_provider == "openai":
+            try:
+                self.api_key = get_secret("open_api_key")
+            except ValueError:
+                # Fallback for backward compatibility
+                self.api_key = os.getenv("LLM_API_KEY")
+                if not self.api_key:
+                    raise ValueError("OpenAI API key not found in secrets or environment variables")
+        elif self.llm_provider == "gemini":
+            try:
+                self.api_key = get_secret("gemini_api_key")
+            except ValueError:
+                self.api_key = os.getenv("GEMINI_API_KEY")
+                if not self.api_key:
+                    raise ValueError("Gemini API key not found in secrets or environment variables")
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
+        
+        # Set models based on provider
+        if self.llm_provider == "openai":
+            self.completion_model = os.getenv("COMPLETION_MODEL", "gpt-4o-mini")
+            self.image_gen_model = os.getenv("IMAGE_GEN_MODEL", "dall-e-2")
+            self.tts_model = os.getenv("TTS_MODEL", "tts-1")
+        elif self.llm_provider == "gemini":
+            self.completion_model = os.getenv("COMPLETION_MODEL", "gemini-1.5-flash")
+            self.image_gen_model = None  # Gemini doesn't have image generation
+            self.tts_model = None  # Gemini doesn't have TTS
+        
         self.max_tokens = int(os.getenv("MAX_TOKENS", "100"))
         self.print_graph = os.getenv("PRINT_GRAPH", "0") == "1"
     
@@ -65,6 +84,9 @@ class ModelConfig:
     
     def get_api_key(self):
         return self.api_key
+    
+    def get_llm_provider(self):
+        return self.llm_provider
     
     def should_print_graph(self):
         return self.print_graph

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -9,8 +7,10 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - LLM_PROVIDER=gemini
     secrets:
       - open_api_key
+      - gemini_api_key
     networks:
       - app-network
 
@@ -32,3 +32,5 @@ networks:
 secrets:
   open_api_key:
     file: ./secrets/open_api_key.txt
+  gemini_api_key:
+    file: ./secrets/gemini_api_key.txt

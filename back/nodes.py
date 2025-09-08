@@ -1,5 +1,6 @@
 from langchain_community.callbacks import get_openai_callback
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
 from langchain_core.messages import HumanMessage
 from util import encode_image_to_base64, model_config
@@ -8,6 +9,22 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def get_llm_instance(max_tokens=None):
+    """Get the appropriate LLM instance based on configuration"""
+    if model_config.get_llm_provider() == "openai":
+        return ChatOpenAI(
+            api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=max_tokens or model_config.get_max_tokens()
+        )
+    elif model_config.get_llm_provider() == "gemini":
+        return ChatGoogleGenerativeAI(
+            google_api_key=model_config.get_api_key(),
+            model=model_config.get_completion_model(),
+            max_tokens=max_tokens or model_config.get_max_tokens()
+        )
+    else:
+        raise ValueError(f"Unsupported LLM provider: {model_config.get_llm_provider()}")
 
 
 def create_ocr_node(image_data):
@@ -32,11 +49,7 @@ def create_ocr_node(image_data):
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}}
             ])
         ]
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=512
-        )
+        llm = get_llm_instance(max_tokens=512)
         try:
             with get_openai_callback() as cb:
                 response = llm.invoke(prompt)
@@ -160,11 +173,7 @@ def create_meme_name_analysis_node():
         
         logger.info("Analyzing meme name...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=model_config.get_max_tokens()
-        )
+        llm = get_llm_instance()
         
         prompt = f"""Identify this meme format by analyzing both the visual structure and text content. 
 
@@ -232,11 +241,7 @@ def create_social_media_detection_node():
         
         logger.info("Detecting social media platform...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=model_config.get_max_tokens()
-        )
+        llm = get_llm_instance()
         
         prompt = f"""Analyze this social media screenshot and identify the specific platform based on visual and textual cues.
 
@@ -309,11 +314,7 @@ def create_recognise_poster_node():
         
         logger.info("Identifying social media poster...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=model_config.get_max_tokens()
-        )
+        llm = get_llm_instance()
         
         prompt = f"""Identify the person or account who posted this social media content by analyzing the text and visual elements.
 
@@ -390,11 +391,7 @@ def create_explain_humor_analysis_node():
         
         logger.info("Explaining meme humor...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=200  # More tokens for detailed explanation
-        )
+        llm = get_llm_instance(max_tokens=200)  # More tokens for detailed explanation
         
         meme_context = f" (Meme format: {meme_name})" if meme_name and meme_name != "Unknown Meme" else ""
         
@@ -442,11 +439,7 @@ def create_sentiment_analysis_node():
         
         logger.info("Analyzing sentiment...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=model_config.get_max_tokens()
-        )
+        llm = get_llm_instance()
         
         prompt = f"""Analyze the sentiment of this text and classify it as one of: POSITIVE, NEGATIVE, NEUTRAL
 
@@ -483,11 +476,7 @@ def create_political_analysis_node():
         
         logger.info("Analyzing political content...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=model_config.get_max_tokens()
-        )
+        llm = get_llm_instance()
         
         prompt = f"""Analyze if this text contains political content. Political content includes:
         - References to politicians, political parties, elections
@@ -528,11 +517,7 @@ def create_outrage_analysis_node():
         
         logger.info("Analyzing outrage content...")
         
-        llm = ChatOpenAI(
-            api_key=model_config.get_api_key(),
-            model=model_config.get_completion_model(),
-            max_tokens=model_config.get_max_tokens()
-        )
+        llm = get_llm_instance()
         
         prompt = f"""Analyze if this text is designed to provoke outrage, anger, or strong emotional reactions. Look for:
         - Inflammatory language, extreme statements
