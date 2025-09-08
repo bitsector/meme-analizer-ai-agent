@@ -59,11 +59,11 @@ class ModelConfig:
         
         # Set models based on provider
         if self.llm_provider == "openai":
-            self.completion_model = os.getenv("COMPLETION_MODEL", "gpt-4o-mini")
-            self.image_gen_model = os.getenv("IMAGE_GEN_MODEL", "dall-e-2")
-            self.tts_model = os.getenv("TTS_MODEL", "tts-1")
+            self.completion_model = os.getenv("OPENAI_COMPLETION_MODEL", os.getenv("COMPLETION_MODEL", "gpt-4o-mini"))
+            self.image_gen_model = os.getenv("OPENAI_IMAGE_GEN_MODEL", os.getenv("IMAGE_GEN_MODEL", "dall-e-2"))
+            self.tts_model = os.getenv("OPENAI_TTS_MODEL", os.getenv("TTS_MODEL", "tts-1"))
         elif self.llm_provider == "gemini":
-            self.completion_model = os.getenv("COMPLETION_MODEL", "gemini-1.5-flash")
+            self.completion_model = os.getenv("GEMINI_COMPLETION_MODEL", os.getenv("COMPLETION_MODEL", "gemini-2.5-flash-lite"))
             self.image_gen_model = None  # Gemini doesn't have image generation
             self.tts_model = None  # Gemini doesn't have TTS
         

@@ -28,13 +28,25 @@ class GeminiUsageTracker:
         return len(str(text)) // 4
     
     def calculate_gemini_cost(self, prompt_tokens, completion_tokens):
-        """Calculate cost for Gemini 1.5 Flash"""
-        # Gemini 1.5 Flash pricing (per 1M tokens)
-        input_cost_per_million = 0.075  # $0.075 per 1M input tokens
-        output_cost_per_million = 0.30  # $0.30 per 1M output tokens
+        """Calculate cost based on specific Gemini model"""
+        model = model_config.get_completion_model().lower()
         
-        input_cost = (prompt_tokens / 1_000_000) * input_cost_per_million
-        output_cost = (completion_tokens / 1_000_000) * output_cost_per_million
+        # Gemini model pricing (per 1M tokens)
+        pricing = {
+            "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
+            "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+            "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
+            "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
+            # Legacy models (fallback pricing)
+            "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
+            "gemini-1.5-pro": {"input": 0.075, "output": 0.30},
+        }
+        
+        # Get pricing for current model or default to cheapest
+        model_pricing = pricing.get(model, pricing["gemini-2.5-flash-lite"])
+        
+        input_cost = (prompt_tokens / 1_000_000) * model_pricing["input"]
+        output_cost = (completion_tokens / 1_000_000) * model_pricing["output"]
         
         return input_cost + output_cost
     
