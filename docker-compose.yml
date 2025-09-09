@@ -11,19 +11,39 @@ services:
     secrets:
       - open_api_key
       - gemini_api_key
+      - google_oauth_client_id
+      - google_oauth_client_secret
+      - jwt_secret
     networks:
       - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    tty: true
+    stdin_open: true
 
   frontend:
-    image: antonbiz/agent-front:1.0
+    build:
+      context: ./front
+      dockerfile: Dockerfile.front
     ports:
       - "3000:3000"
     depends_on:
       - backend
     environment:
       - BACKEND_URL=http://backend:8000
+      - NODE_ENV=development
     networks:
       - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    tty: true
+    stdin_open: true
 
 networks:
   app-network:
@@ -34,3 +54,9 @@ secrets:
     file: ./secrets/open_api_key.txt
   gemini_api_key:
     file: ./secrets/gemini_api_key.txt
+  google_oauth_client_id:
+    file: ./secrets/google_oauth_client_id.txt
+  google_oauth_client_secret:
+    file: ./secrets/google_oauth_client_secret.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt

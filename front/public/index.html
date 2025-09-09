@@ -397,6 +397,79 @@
             text-align: center;
         }
 
+        /* Authentication styles */
+        .auth-section {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .auth-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .login-btn {
+            background: #4285f4;
+            color: white;
+        }
+
+        .login-btn:hover {
+            background: #3367d6;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .logout-btn {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+        }
+
+        .user-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .auth-status {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -418,10 +491,16 @@
     </style>
 </head>
 <body>
+    <!-- Authentication Section -->
+    <div class="auth-section" id="authSection">
+        <!-- Auth content will be dynamically inserted here -->
+    </div>
+
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-eye"></i> AI Vision Analyzer</h1>
             <p>Upload an image to analyze text, detect content type, and extract insights using AI</p>
+            <div class="auth-status" id="authStatus" style="display: none;"></div>
         </div>
         
         <div class="main-card">
@@ -466,6 +545,7 @@
         <i class="fas fa-bug"></i>
     </button>
 
+    <script src="auth.js"></script>
     <script>
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -596,7 +676,7 @@
             try {
                 showDebug(`Sending file ${file.name} to backend...`);
                 
-                const response = await fetch('/upload', {
+                const response = await fetch('http://localhost:8000/analyze', {
                     method: 'POST',
                     body: formData
                 });
@@ -742,6 +822,20 @@
                                 <strong>Tokens:</strong> ${result.usage.total_tokens} 
                                 (${result.usage.prompt_tokens} prompt, ${result.usage.completion_tokens} completion)<br>
                                 <strong>Cost:</strong> $${result.usage.total_cost ? result.usage.total_cost.toFixed(6) : '0.000000'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Analyzed By (show user info if available)
+            if (result.analyzed_by) {
+                html += `
+                    <div class="result-section">
+                        <h3><i class="fas fa-user-check"></i> Analyzed By</h3>
+                        <div class="result-content">
+                            <div class="usage-info">
+                                ${result.analyzed_by === 'anonymous' ? 'Anonymous User' : result.analyzed_by}
                             </div>
                         </div>
                     </div>
