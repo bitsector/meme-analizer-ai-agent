@@ -1,36 +1,36 @@
-from langchain_community.callbacks import get_openai_callback
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
-from langchain_core.messages import HumanMessage
-from langchain_core.callbacks import BaseCallbackHandler
-from util import encode_image_to_base64, model_config
-from logging_config import get_logger
 import tiktoken
+from langchain_community.callbacks import get_openai_callback
+from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import HumanMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from logging_config import get_logger
+from util import encode_image_to_base64, model_config
 
 logger = get_logger(__name__)
 
 
 class GeminiUsageTracker:
     """Simple token usage tracker for Gemini models"""
-    
+
     def __init__(self):
         self.reset()
-    
+
     def reset(self):
         self.prompt_tokens = 0
         self.completion_tokens = 0
         self.total_tokens = 0
         self.total_cost = 0.0
-    
+
     def estimate_tokens(self, text):
         """Rough token estimation (4 chars = 1 token)"""
         return len(str(text)) // 4
-    
+
     def calculate_gemini_cost(self, prompt_tokens, completion_tokens):
         """Calculate cost based on specific Gemini model"""
         model = model_config.get_completion_model().lower()
-        
+
         # Gemini model pricing (per 1M tokens)
         pricing = {
             "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
@@ -41,21 +41,23 @@ class GeminiUsageTracker:
             "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
             "gemini-1.5-pro": {"input": 0.075, "output": 0.30},
         }
-        
+
         # Get pricing for current model or default to cheapest
         model_pricing = pricing.get(model, pricing["gemini-2.5-flash-lite"])
-        
+
         input_cost = (prompt_tokens / 1_000_000) * model_pricing["input"]
         output_cost = (completion_tokens / 1_000_000) * model_pricing["output"]
-        
+
         return input_cost + output_cost
-    
+
     def track_usage(self, prompt, response):
         """Track usage for a prompt/response pair"""
         self.prompt_tokens = self.estimate_tokens(prompt)
         self.completion_tokens = self.estimate_tokens(response)
         self.total_tokens = self.prompt_tokens + self.completion_tokens
-        self.total_cost = self.calculate_gemini_cost(self.prompt_tokens, self.completion_tokens)
+        self.total_cost = self.calculate_gemini_cost(
+            self.prompt_tokens, self.completion_tokens
+        )
 
 
 def get_llm_instance(max_tokens=None):
@@ -64,13 +66,13 @@ def get_llm_instance(max_tokens=None):
         return ChatOpenAI(
             api_key=model_config.get_api_key(),
             model=model_config.get_completion_model(),
-            max_tokens=max_tokens or model_config.get_max_tokens()
+            max_tokens=max_tokens or model_config.get_max_tokens(),
         )
     elif model_config.get_llm_provider() == "gemini":
         return ChatGoogleGenerativeAI(
             google_api_key=model_config.get_api_key(),
             model=model_config.get_completion_model(),
-            max_tokens=max_tokens or model_config.get_max_tokens()
+            max_tokens=max_tokens or model_config.get_max_tokens(),
         )
     else:
         raise ValueError(f"Unsupported LLM provider: {model_config.get_llm_provider()}")
@@ -78,11 +80,15 @@ def get_llm_instance(max_tokens=None):
 
 def create_ocr_node(image_data):
     """Create OCR node that extracts text and classifies content type"""
+
     def ocr_node(state):
         image_b64 = encode_image_to_base64(image_data)
         prompt = [
-            HumanMessage(content=[
-                {"type": "text", "text": """Please analyze this image and provide:
+            HumanMessage(
+                content=[
+                    {
+                        "type": "text",
+                        "text": """Please analyze this image and provide:
 
                 1. OCR: Extract all the text you see in the image
                 2. CONTENT_TYPE: Classify the content as one of these categories:
@@ -94,9 +100,14 @@ def create_ocr_node(image_data):
 
                 Format your response exactly like this:
                 OCR: [extracted text here]
-                CONTENT_TYPE: [MEME/ARTICLE/FACTS/SOCIAL_MEDIA/OTHER]"""},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}}
-            ])
+                CONTENT_TYPE: [MEME/ARTICLE/FACTS/SOCIAL_MEDIA/OTHER]""",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{image_b64}"},
+                    },
+                ]
+            )
         ]
         llm = get_llm_instance(max_tokens=512)
         try:
@@ -124,10 +135,15 @@ def create_ocr_node(image_data):
         except Exception as e:
             error_msg = str(e)
             provider = model_config.get_llm_provider().upper()
-            if "unsupported_country_region_territory" in error_msg or "403" in error_msg:
-                logger.error(f"{provider} API is not available in your region. Please use a VPN or try alternative solutions.")
+            if (
+                "unsupported_country_region_territory" in error_msg
+                or "403" in error_msg
+            ):
+                logger.error(
+                    f"{provider} API is not available in your region. Please use a VPN or try alternative solutions."
+                )
                 return {
-                    "ocr_result": f"Error: {provider} API blocked in your region", 
+                    "ocr_result": f"Error: {provider} API blocked in your region",
                     "content_type": "ERROR",
                     "search_results": "",
                     "meme_name": "",
@@ -137,38 +153,40 @@ def create_ocr_node(image_data):
                     "sentiment": "",
                     "is_political": "",
                     "is_outrage": "",
-                    "cb": {"error": error_msg}
+                    "cb": {"error": error_msg},
                 }
             else:
                 raise e
-        
+
         # Parse the response to extract OCR and content type
         response_text = response.content
         ocr_result = ""
         content_type = "OTHER"
-        
+
         try:
-            lines = response_text.split('\n')
+            lines = response_text.split("\n")
             for line in lines:
-                if line.startswith('OCR:'):
-                    ocr_result = line.replace('OCR:', '').strip()
-                elif line.startswith('CONTENT_TYPE:'):
-                    content_type = line.replace('CONTENT_TYPE:', '').strip()
+                if line.startswith("OCR:"):
+                    ocr_result = line.replace("OCR:", "").strip()
+                elif line.startswith("CONTENT_TYPE:"):
+                    content_type = line.replace("CONTENT_TYPE:", "").strip()
         except:
             # Fallback: use the entire response as OCR result
             ocr_result = response_text
             content_type = "OTHER"
-        
+
         # Log usage info
         provider = model_config.get_llm_provider().upper()
-        logger.info(f"{provider} Usage: {cb_info['total_tokens']} tokens (prompt: {cb_info['prompt_tokens']}, completion: {cb_info['completion_tokens']}), cost: ${cb_info['total_cost']:.6f}")
-        
+        logger.info(
+            f"{provider} Usage: {cb_info['total_tokens']} tokens (prompt: {cb_info['prompt_tokens']}, completion: {cb_info['completion_tokens']}), cost: ${cb_info['total_cost']:.6f}"
+        )
+
         # Log extracted text and classification
         logger.debug(f"Extracted text:\n{ocr_result}")
         logger.info(f"Content type: {content_type}")
-        
+
         return {
-            "ocr_result": ocr_result, 
+            "ocr_result": ocr_result,
             "content_type": content_type,
             "search_results": "",
             "meme_name": "",
@@ -178,67 +196,73 @@ def create_ocr_node(image_data):
             "sentiment": "",
             "is_political": "",
             "is_outrage": "",
-            "cb": cb_info
+            "cb": cb_info,
         }
+
     return ocr_node
 
 
 def create_search_node():
     """Create search node that performs web search for ARTICLE/FACTS content"""
+
     def search_node(state):
         content_type = state.get("content_type", "OTHER")
         ocr_result = state.get("ocr_result", "")
-        
+
         # Only search if content is ARTICLE or FACTS
         if content_type in ["ARTICLE", "FACTS"] and ocr_result.strip():
             try:
                 logger.info(f"Searching online for {content_type.lower()} content...")
-                
+
                 # Initialize search tool
                 search = DuckDuckGoSearchRun()
-                
+
                 # Create intelligent search query from OCR text
                 # Take first few sentences or key phrases
                 search_query = ocr_result[:200].strip()
                 if len(search_query) > 100:
                     # Try to cut at sentence boundary
-                    sentences = search_query.split('.')
+                    sentences = search_query.split(".")
                     if len(sentences) > 1:
-                        search_query = sentences[0] + '.'
-                
+                        search_query = sentences[0] + "."
+
                 # Perform search
                 search_results = search.run(search_query)
-                
+
                 logger.info(f"Found search results")
                 logger.debug(f"Search results:\n{search_results}")
-                
+
                 return {**state, "search_results": search_results}
-                
+
             except Exception as e:
                 logger.error(f"Search failed: {str(e)}")
                 return {**state, "search_results": f"Search failed: {str(e)}"}
         else:
             logger.info(f"Skipping search for content type: {content_type}")
-            return {**state, "search_results": f"No search performed - {content_type} content doesn't require fact-checking"}
-    
+            return {
+                **state,
+                "search_results": f"No search performed - {content_type} content doesn't require fact-checking",
+            }
+
     return search_node
 
 
 def create_meme_name_analysis_node():
     """Create meme name analysis node for identifying popular meme formats"""
+
     def meme_name_analysis_node(state):
         ocr_result = state.get("ocr_result", "")
         content_type = state.get("content_type", "")
-        
+
         # Only analyze meme names for MEME content
         if content_type != "MEME" or not ocr_result.strip():
             logger.info("Skipping meme name analysis - not a meme or no text")
             return {**state, "meme_name": "N/A"}
-        
+
         logger.info("Analyzing meme name...")
-        
+
         llm = get_llm_instance()
-        
+
         prompt = f"""Identify this meme format by analyzing both the visual structure and text content. 
 
         VISUAL ANALYSIS (Primary):
@@ -273,40 +297,43 @@ def create_meme_name_analysis_node():
         - If it's completely custom or unrecognizable: respond with "Custom Meme"
 
         Respond with only the meme name or category, nothing else."""
-        
+
         try:
             response = llm.invoke(prompt)
             meme_name = response.content.strip()
-            
+
             # Clean up response
             if not meme_name or len(meme_name) > 100:
                 meme_name = "Unknown Meme"
-            
+
             logger.info(f"Meme name: {meme_name}")
             return {**state, "meme_name": meme_name}
-            
+
         except Exception as e:
             logger.error(f"Meme name analysis failed: {str(e)}")
             return {**state, "meme_name": "Analysis Failed"}
-    
+
     return meme_name_analysis_node
 
 
 def create_social_media_detection_node():
     """Create social media platform detection node for identifying the specific platform"""
+
     def social_media_detection_node(state):
         ocr_result = state.get("ocr_result", "")
         content_type = state.get("content_type", "")
-        
+
         # Only analyze social media platform for SOCIAL_MEDIA content
         if content_type != "SOCIAL_MEDIA" or not ocr_result.strip():
-            logger.info("Skipping social media detection - not social media content or no text")
+            logger.info(
+                "Skipping social media detection - not social media content or no text"
+            )
             return {**state, "social_media_platform": "N/A"}
-        
+
         logger.info("Detecting social media platform...")
-        
+
         llm = get_llm_instance()
-        
+
         prompt = f"""Analyze this social media screenshot and identify the specific platform based on visual and textual cues.
 
         VISUAL INDICATORS TO LOOK FOR:
@@ -340,46 +367,61 @@ def create_social_media_detection_node():
         RESPONSE: Identify the most likely social media platform. If multiple platforms seem possible, choose the most likely one based on the strongest indicators.
 
         Respond with only the platform name: TWITTER, FACEBOOK, INSTAGRAM, REDDIT, TIKTOK, LINKEDIN, DISCORD, SNAPCHAT, YOUTUBE, TELEGRAM, or UNKNOWN if unclear."""
-        
+
         try:
             response = llm.invoke(prompt)
             platform = response.content.strip().upper()
-            
+
             # Validate response
-            valid_platforms = ["TWITTER", "FACEBOOK", "INSTAGRAM", "REDDIT", "TIKTOK", "LINKEDIN", "DISCORD", "SNAPCHAT", "YOUTUBE", "TELEGRAM", "UNKNOWN"]
+            valid_platforms = [
+                "TWITTER",
+                "FACEBOOK",
+                "INSTAGRAM",
+                "REDDIT",
+                "TIKTOK",
+                "LINKEDIN",
+                "DISCORD",
+                "SNAPCHAT",
+                "YOUTUBE",
+                "TELEGRAM",
+                "UNKNOWN",
+            ]
             if platform not in valid_platforms:
                 platform = "UNKNOWN"
-            
+
             # Handle X/Twitter naming
             if platform == "X":
                 platform = "TWITTER"
-            
+
             logger.info(f"Detected platform: {platform}")
             return {**state, "social_media_platform": platform}
-            
+
         except Exception as e:
             logger.error(f"Social media detection failed: {str(e)}")
             return {**state, "social_media_platform": "UNKNOWN"}
-    
+
     return social_media_detection_node
 
 
 def create_recognise_poster_node():
     """Create poster recognition node for identifying who posted the social media content"""
+
     def recognise_poster_node(state):
         ocr_result = state.get("ocr_result", "")
         content_type = state.get("content_type", "")
         platform = state.get("social_media_platform", "")
-        
+
         # Only analyze poster for SOCIAL_MEDIA content
         if content_type != "SOCIAL_MEDIA" or not ocr_result.strip():
-            logger.info("Skipping poster recognition - not social media content or no text")
+            logger.info(
+                "Skipping poster recognition - not social media content or no text"
+            )
             return {**state, "poster_name": "N/A"}
-        
+
         logger.info("Identifying social media poster...")
-        
+
         llm = get_llm_instance()
-        
+
         prompt = f"""Identify the person or account who posted this social media content by analyzing the text and visual elements.
 
         PLATFORM CONTEXT: {platform}
@@ -419,46 +461,51 @@ def create_recognise_poster_node():
         IMPORTANT: Only identify the ORIGINAL POSTER of this content, not people mentioned in comments or replies.
 
         Respond with only the poster's name or username, nothing else."""
-        
+
         try:
             response = llm.invoke(prompt)
             poster = response.content.strip()
-            
+
             # Clean up response
             if not poster or len(poster) > 100:
                 poster = "Unknown User"
-            
+
             # Remove common prefixes if they appear
             poster = poster.replace("@", "").replace("u/", "").strip()
-            
+
             logger.info(f"Identified poster: {poster}")
             return {**state, "poster_name": poster}
-            
+
         except Exception as e:
             logger.error(f"Poster recognition failed: {str(e)}")
             return {**state, "poster_name": "Unknown User"}
-    
+
     return recognise_poster_node
 
 
 def create_explain_humor_analysis_node():
     """Create humor explanation node for analyzing why memes are funny"""
+
     def explain_humor_analysis_node(state):
         ocr_result = state.get("ocr_result", "")
         content_type = state.get("content_type", "")
         meme_name = state.get("meme_name", "")
-        
+
         # Only explain humor for MEME content
         if content_type != "MEME" or not ocr_result.strip():
             logger.info("Skipping humor explanation - not a meme or no text")
             return {**state, "explain_humor": "N/A"}
-        
+
         logger.info("Explaining meme humor...")
-        
+
         llm = get_llm_instance(max_tokens=200)  # More tokens for detailed explanation
-        
-        meme_context = f" (Meme format: {meme_name})" if meme_name and meme_name != "Unknown Meme" else ""
-        
+
+        meme_context = (
+            f" (Meme format: {meme_name})"
+            if meme_name and meme_name != "Unknown Meme"
+            else ""
+        )
+
         prompt = f"""Explain why this meme is funny. Analyze the humor, cultural references, irony, and what makes it amusing{meme_context}.
 
         Meme text: {ocr_result}
@@ -471,77 +518,79 @@ def create_explain_humor_analysis_node():
         - Any wordplay, visual gags, or timing involved?
 
         Provide a concise but insightful explanation in 2-3 sentences."""
-        
+
         try:
             response = llm.invoke(prompt)
             explanation = response.content.strip()
-            
+
             # Ensure reasonable length
             if len(explanation) > 500:
                 explanation = explanation[:497] + "..."
             elif not explanation:
                 explanation = "Humor analysis unavailable"
-            
+
             logger.info(f"Humor explanation generated ({len(explanation)} chars)")
             return {**state, "explain_humor": explanation}
-            
+
         except Exception as e:
             logger.error(f"Humor explanation failed: {str(e)}")
             return {**state, "explain_humor": "Humor analysis failed"}
-    
+
     return explain_humor_analysis_node
 
 
 def create_sentiment_analysis_node():
     """Create sentiment analysis node for analyzing emotional tone"""
+
     def sentiment_analysis_node(state):
         ocr_result = state.get("ocr_result", "")
-        
+
         if not ocr_result.strip():
             logger.info("No text to analyze for sentiment")
             return {**state, "sentiment": "NEUTRAL"}
-        
+
         logger.info("Analyzing sentiment...")
-        
+
         llm = get_llm_instance()
-        
+
         prompt = f"""Analyze the sentiment of this text and classify it as one of: POSITIVE, NEGATIVE, NEUTRAL
 
         Text: {ocr_result}
 
         Respond with only one word: POSITIVE, NEGATIVE, or NEUTRAL"""
-        
+
         try:
             response = llm.invoke(prompt)
             sentiment = response.content.strip().upper()
-            
+
             # Validate response
             if sentiment not in ["POSITIVE", "NEGATIVE", "NEUTRAL"]:
                 sentiment = "NEUTRAL"
-            
+
             logger.info(f"Sentiment: {sentiment}")
             return {**state, "sentiment": sentiment}
-            
+
         except Exception as e:
             logger.error(f"Sentiment analysis failed: {str(e)}")
             return {**state, "sentiment": "NEUTRAL"}
-    
+
     return sentiment_analysis_node
 
 
 def create_political_analysis_node():
     """Create political content analysis node"""
+
     def political_analysis_node(state):
         ocr_result = state.get("ocr_result", "")
-        
+
         if not ocr_result.strip():
             logger.info("No text to analyze for political content")
             return {**state, "is_political": "NO"}
-        
+
         logger.info("Analyzing political content...")
-        
+
         llm = get_llm_instance()
-        
+
         prompt = f"""Analyze if this text contains political content. Political content includes:
         - References to politicians, political parties, elections
         - Policy discussions, government actions
@@ -551,38 +600,39 @@ def create_political_analysis_node():
         Text: {ocr_result}
 
         Respond with only: YES or NO"""
-        
+
         try:
             response = llm.invoke(prompt)
             is_political = response.content.strip().upper()
-            
+
             # Validate response
             if is_political not in ["YES", "NO"]:
                 is_political = "NO"
-            
+
             logger.info(f"Political content: {is_political}")
             return {**state, "is_political": is_political}
-            
+
         except Exception as e:
             logger.error(f"Political analysis failed: {str(e)}")
             return {**state, "is_political": "NO"}
-    
+
     return political_analysis_node
 
 
 def create_outrage_analysis_node():
     """Create outrage content analysis node"""
+
     def outrage_analysis_node(state):
         ocr_result = state.get("ocr_result", "")
-        
+
         if not ocr_result.strip():
             logger.info("No text to analyze for outrage content")
             return {**state, "is_outrage": "NO"}
-        
+
         logger.info("Analyzing outrage content...")
-        
+
         llm = get_llm_instance()
-        
+
         prompt = f"""Analyze if this text is designed to provoke outrage, anger, or strong emotional reactions. Look for:
         - Inflammatory language, extreme statements
         - Divisive or polarizing content
@@ -593,27 +643,29 @@ def create_outrage_analysis_node():
         Text: {ocr_result}
 
         Respond with only: YES or NO"""
-        
+
         try:
             response = llm.invoke(prompt)
             is_outrage = response.content.strip().upper()
-            
+
             # Validate response
             if is_outrage not in ["YES", "NO"]:
                 is_outrage = "NO"
-            
+
             logger.info(f"Outrage content: {is_outrage}")
             return {**state, "is_outrage": is_outrage}
-            
+
         except Exception as e:
             logger.error(f"Outrage analysis failed: {str(e)}")
             return {**state, "is_outrage": "NO"}
-    
+
     return outrage_analysis_node
 
 
 def create_result_node():
     """Create result aggregation node"""
+
     def result_node(state):
         return state
+
     return result_node

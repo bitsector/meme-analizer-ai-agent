@@ -143,3 +143,31 @@ The application will be available at:
 - Multer - File upload handling
 - Axios - HTTP client
 - form-data - Multipart form data handling
+
+## Development
+
+### Code Linting
+
+#### Backend (Python)
+
+Install linting tools:
+```bash
+pip install black isort mypy
+```
+
+Run linting (from `back/` directory):
+```bash
+black . && isort .
+```
+
+#### Frontend (Node.js)
+
+Install linting tools:
+```bash
+npm install --save-dev prettier
+```
+
+Run linting (from `front/` directory):
+```bash
+npx prettier --check .
+```

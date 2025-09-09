@@ -1,6 +1,7 @@
-from util import print_graph_structure, print_detailed_graph_structure, try_generate_visual_graph, model_config
-from workflow import get_workflow
 from logging_config import get_logger
+from util import (model_config, print_detailed_graph_structure,
+                  print_graph_structure, try_generate_visual_graph)
+from workflow import get_workflow
 
 logger = get_logger(__name__)
 
@@ -8,7 +9,7 @@ logger = get_logger(__name__)
 def analyze_image(image_data):
     """
     Main service function for analyzing images using LangGraph workflow.
-    
+
     This function takes image data and processes it through a multi-stage analysis pipeline:
     1. OCR extraction and content type classification
     2. Conditional routing based on content type:
@@ -18,10 +19,10 @@ def analyze_image(image_data):
     3. Political content analysis
     4. Outrage content analysis
     5. Result aggregation
-    
+
     Args:
         image_data: Raw image bytes or file path to image
-        
+
     Returns:
         dict: Analysis results containing:
             - text: Extracted OCR text
@@ -36,15 +37,15 @@ def analyze_image(image_data):
     """
     # Get the compiled workflow
     graph = get_workflow(image_data)
-    
+
     # Print graph structure (if enabled)
     print_graph_structure(graph, graph)
-    
+
     result = graph.invoke({})
-    
+
     # Debug: Log the final result state
     logger.info(f"Final result state: {result}")
-    
+
     return {
         "text": result.get("ocr_result", ""),
         "content_type": result.get("content_type", ""),
@@ -56,22 +57,23 @@ def analyze_image(image_data):
         "sentiment": result.get("sentiment", ""),
         "is_political": result.get("is_political", ""),
         "is_outrage": result.get("is_outrage", ""),
-        "usage": result.get("cb", {})
+        "usage": result.get("cb", {}),
     }
+
 
 def main():
     """Visualize the LangGraph structure and generate PNG image"""
     logger.info("Building LangGraph workflow for visualization...")
-    
+
     # Get the workflow (with dummy image data for structure)
     graph = get_workflow(None)
-    
+
     # Print detailed graph structure (if enabled)
     print_detailed_graph_structure()
-    
+
     # Try to generate visual graph (if enabled)
     try_generate_visual_graph(graph)
 
+
 if __name__ == "__main__":
     main()
-

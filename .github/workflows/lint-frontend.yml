@@ -1,0 +1,48 @@
+name: Lint Frontend
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'front/**/*.js'
+      - 'front/**/*.jsx'
+      - 'front/**/*.ts'
+      - 'front/**/*.tsx'
+      - 'front/package.json'
+      - 'front/package-lock.json'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'front/**/*.js'
+      - 'front/**/*.jsx'
+      - 'front/**/*.ts'
+      - 'front/**/*.tsx'
+      - 'front/package.json'
+      - 'front/package-lock.json'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: front/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd front && npm ci
+        npm install -g eslint prettier
+    
+    - name: Run ESLint
+      run: |
+        cd front && npx eslint . --ext .js,.jsx,.ts,.tsx
+    
+    - name: Run Prettier (formatting check)
+      run: |
+        cd front && npx prettier --check .
