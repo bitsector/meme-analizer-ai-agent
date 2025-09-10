@@ -149,7 +149,6 @@ secrets/
 
 # Firebase
 .firebase/
-public/
 
 # Terraform
 terraform/.terraform/

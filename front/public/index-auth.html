@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Analysis Service - Microsoft SSO</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+            flex-grow: 1;
+        }
+        .auth-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .login-btn, .logout-btn {
+            background-color: #0078d4;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .login-btn:hover, .logout-btn:hover {
+            background-color: #106ebe;
+        }
+        .user-info {
+            font-size: 14px;
+            color: #666;
+        }
+        .auth-required {
+            text-align: center;
+            padding: 40px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .upload-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 OCR Analysis Service</h1>
+            <div class="auth-section">
+                <div id="userInfo" class="user-info" style="display: none;"></div>
+                <button id="loginBtn" class="login-btn" onclick="login()">Sign in with Microsoft</button>
+                <button id="logoutBtn" class="logout-btn" onclick="logout()" style="display: none;">Sign out</button>
+            </div>
+        </div>
+
+        <div id="authRequired" class="auth-required">
+            <h3>🔐 Authentication Required</h3>
+            <p>Please sign in with your Microsoft account to use the OCR Analysis Service.</p>
+            <button class="login-btn" onclick="login()">Sign in with Microsoft</button>
+        </div>
+        
+        <div id="mainApp" style="display: none;">
+            <div class="upload-area" id="uploadArea">
+                <p>📁 Drag and drop an image file here or click to browse</p>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    Choose File
+                </button>
+                <input type="file" id="fileInput" accept="image/*">
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyzing image...</p>
+            </div>
+
+            <div class="result" id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let authToken = localStorage.getItem('auth_token');
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+
+        // Check authentication status on page load
+        window.addEventListener('load', async () => {
+            if (authToken) {
+                try {
+                    const response = await fetch('/api/auth/me', {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        setAuthenticatedState(data.user);
+                    } else {
+                        localStorage.removeItem('auth_token');
+                        authToken = null;
+                        setUnauthenticatedState();
+                    }
+                } catch (error) {
+                    console.error('Auth check failed:', error);
+                    setUnauthenticatedState();
+                }
+            } else {
+                setUnauthenticatedState();
+            }
+
+            // Handle OAuth callback
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            if (code) {
+                await handleAuthCallback(code);
+            }
+        });
+
+        async function login() {
+            try {
+                const redirectUri = `${window.location.origin}`;
+                const response = await fetch(`/api/auth/login?redirect_uri=${encodeURIComponent(redirectUri)}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('auth_state', data.state);
+                    window.location.href = data.auth_url;
+                } else {
+                    showResult(`Login failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showResult(`Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_state');
+            authToken = null;
+            currentUser = null;
+            setUnauthenticatedState();
+        }
+
+        async function handleAuthCallback(code) {
+            try {
+                const redirectUri = window.location.origin;
+                const response = await fetch('/api/auth/callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, redirect_uri: redirectUri })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    localStorage.setItem('auth_token', authToken);
+                    setAuthenticatedState(data.user);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    throw new Error(data.detail || 'Authentication failed');
+                }
+            } catch (error) {
+                showResult(`Authentication error: ${error.message}`, 'error');
+                setUnauthenticatedState();
+            }
+        }
+
+        function setAuthenticatedState(user) {
+            currentUser = user;
+            document.getElementById('authRequired').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('userInfo').style.display = 'block';
+            document.getElementById('userInfo').textContent = `Welcome, ${user.name}`;
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'inline-block';
+        }
+
+        function setUnauthenticatedState() {
+            currentUser = null;
+            document.getElementById('authRequired').style.display = 'block';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'none';
+            document.getElementById('loginBtn').style.display = 'inline-block';
+            document.getElementById('logoutBtn').style.display = 'none';
+        }
+
+        // File handling (only when authenticated)
+        uploadArea.addEventListener('dragover', (e) => {
+            if (!currentUser) return;
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            if (!currentUser) return;
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (!currentUser) return;
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        async function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showResult('Please select an image file.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            loading.style.display = 'block';
+            result.style.display = 'none';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(formatResult(data), 'success');
+                } else if (response.status === 401) {
+                    localStorage.removeItem('auth_token');
+                    authToken = null;
+                    setUnauthenticatedState();
+                    showResult('Your session has expired. Please sign in again.', 'error');
+                } else {
+                    showResult(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(`Network error: ${error.message}`, 'error');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function formatResult(data) {
+            let html = `<h3>📄 File: ${data.filename}</h3>`;
+            if (data.analyzed_by) html += `<p><strong>Analyzed by:</strong> ${data.analyzed_by}</p>`;
+            if (data.text) html += `<h4>📝 Text:</h4><p>${data.text.replace(/\n/g, '<br>')}</p>`;
+            if (data.meme_name) html += `<h4>🎭 Meme:</h4><p>${data.meme_name}</p>`;
+            return html;
+        }
+
+        function showResult(content, type) {
+            result.innerHTML = content;
+            result.className = `result ${type}`;
+            result.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
